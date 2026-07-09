@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #fbfaf7;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  color: #2d2a26;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    linear-gradient(180deg, rgba(242, 223, 184, 0.34), rgba(251, 250, 247, 0) 260px),
+    #fbfaf7;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #d89b4a;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #f2dfb8;
+}
