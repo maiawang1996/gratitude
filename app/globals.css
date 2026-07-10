@@ -15,10 +15,52 @@ body {
   min-height: 100%;
   margin: 0;
   color: #2d2a26;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "PingFang SC", "Hiragino Sans GB", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-feature-settings: "kern";
+  text-rendering: optimizeLegibility;
   background:
-    linear-gradient(180deg, rgba(242, 223, 184, 0.34), rgba(251, 250, 247, 0) 260px),
+    linear-gradient(145deg, rgba(255, 242, 213, 0.68), rgba(251, 250, 247, 0) 34rem),
+    linear-gradient(215deg, rgba(232, 238, 232, 0.56), rgba(251, 250, 247, 0) 30rem),
+    repeating-linear-gradient(90deg, rgba(184, 113, 93, 0.035) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg, rgba(105, 121, 103, 0.028) 0 1px, transparent 1px 84px),
     #fbfaf7;
+}
+
+.warm-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.warm-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.2), rgba(255, 253, 249, 0.78) 62%),
+    linear-gradient(120deg, rgba(216, 155, 74, 0.12), transparent 42%),
+    linear-gradient(300deg, rgba(184, 113, 93, 0.09), transparent 48%);
+}
+
+.warm-shell section,
+.warm-shell header > div,
+.warm-shell button {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+@media (hover: hover) {
+  .warm-shell button:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.warm-shell button:active {
+  transform: translateY(0);
 }
 
 button,

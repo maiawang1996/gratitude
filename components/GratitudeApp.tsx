@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   ChevronRight,
-  Clock,
   Heart,
   Inbox,
   Lock,
@@ -36,12 +35,6 @@ export function GratitudeApp() {
   const remaining = Math.max(0, 220 - note.length);
   const readableDeliveryTime = formatDeliveryTime(deliveryTime);
   const canSave = note.trim().length >= 18 && sender !== null && deliveryMode !== null;
-  const deliverySummary =
-    deliveryMode === "now"
-      ? "立即送达"
-      : deliveryMode === "scheduled"
-        ? readableDeliveryTime
-        : "选择送达方式";
   const emptyDeliveryText =
     deliveryMode === "now"
       ? "新的内容会在立即送达后出现在这里。"
@@ -50,12 +43,12 @@ export function GratitudeApp() {
     if (note.trim().length === 0) return "草稿为空";
     if (note.trim().length < 18) return "还可以再写一点";
     if (sender === null) return "请选择来自谁";
-    if (deliveryMode === null) return "请选择送达方式";
+    if (deliveryMode === null) return "还差一步";
     return deliveryMode === "now" ? "可以立即送达" : "今晚可以送达";
   }, [deliveryMode, note, sender]);
 
   return (
-    <main className="min-h-screen bg-paper text-ink">
+    <main className="warm-shell min-h-screen bg-paper text-ink">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-5 sm:gap-7 sm:px-8 lg:px-10">
         <header className="flex items-center justify-between gap-3 py-1">
           <div className="flex min-w-0 items-center gap-3">
@@ -90,15 +83,8 @@ export function GratitudeApp() {
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-5">
             <section className="rounded-[8px] border border-[#e6dccd] bg-white p-5 shadow-quiet sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-moss">今天写一句</p>
-                  <h2 className="mt-1 text-2xl font-semibold leading-tight">今晚送达的一句话</h2>
-                </div>
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-mist px-3 py-2 text-sm text-moss">
-                  <Clock className="h-4 w-4" aria-hidden="true" />
-                  {deliverySummary}
-                </div>
+              <div>
+                <h2 className="text-2xl font-semibold leading-tight">今天想说点什么</h2>
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-2 rounded-[8px] bg-[#f5efe6] p-1">
@@ -208,7 +194,7 @@ export function GratitudeApp() {
                     ? "立即送达"
                     : deliveryMode === "scheduled"
                       ? "存到今晚"
-                      : "选择送达方式"}
+                      : "保存"}
                 </button>
               </div>
             </section>

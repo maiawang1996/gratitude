@@ -20,7 +20,17 @@ const config: Config = {
         quiet: "0 18px 45px rgba(68, 56, 40, 0.08)"
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]
+        sans: [
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "SF Pro Text",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Microsoft YaHei UI",
+          "Microsoft YaHei",
+          "sans-serif"
+        ]
       }
     }
   },
