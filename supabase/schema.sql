@@ -31,8 +31,7 @@ create table public.gratitude_entries (
   recipient_reaction public.gratitude_reaction not null default 'none',
   recipient_seen_at timestamptz,
   recipient_loved_at timestamptz,
-  created_at timestamptz not null default now(),
-  unique (couple_id, author_id, local_entry_date)
+  created_at timestamptz not null default now()
 );
 
 create table public.generated_reviews (
@@ -56,10 +55,35 @@ create table public.generated_reviews (
   unique (couple_id, review_type, period_start, period_end)
 );
 
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text not null default '',
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.get_push_subscriptions_for_user(target_user_id uuid)
+returns setof public.push_subscriptions
+language sql
+security definer
+set search_path = public
+as $$
+  select *
+  from public.push_subscriptions
+  where user_id = target_user_id
+    and enabled = true
+$$;
+
 alter table public.couples enable row level security;
 alter table public.couple_members enable row level security;
 alter table public.gratitude_entries enable row level security;
 alter table public.generated_reviews enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 create or replace function public.prevent_gratitude_entry_content_changes()
 returns trigger
@@ -75,7 +99,10 @@ begin
     or new.body <> old.body
     or new.local_entry_date <> old.local_entry_date
     or new.deliver_at <> old.deliver_at
-    or new.created_at <> old.created_at then
+    or new.created_at <> old.created_at
+    or new.recipient_seen_at is distinct from old.recipient_seen_at
+    or new.recipient_loved_at is distinct from old.recipient_loved_at
+    or new.recipient_reaction <> old.recipient_reaction then
     raise exception 'Gratitude entries cannot be edited after sending.';
   end if;
 
@@ -95,7 +122,11 @@ security definer
 set search_path = public
 as $$
 begin
-  raise exception 'Gratitude entries cannot be deleted.';
+  if old.author_id <> auth.uid() then
+    raise exception 'Only the author can delete this entry.';
+  end if;
+
+  return old;
 end;
 $$;
 
@@ -148,7 +179,17 @@ with check (
 create policy "recipients can mark entries seen or loved"
 on public.gratitude_entries for update
 using (recipient_id = auth.uid())
-with check (recipient_id = auth.uid());
+with check (
+  recipient_id = auth.uid()
+  and (
+    recipient_reaction = 'seen'
+    or recipient_reaction = 'loved'
+  )
+);
+
+create policy "authors can delete their entries"
+on public.gratitude_entries for delete
+using (author_id = auth.uid());
 
 create policy "members can read generated reviews"
 on public.generated_reviews for select
@@ -159,3 +200,8 @@ using (
       and couple_members.user_id = auth.uid()
   )
 );
+
+create policy "users can manage their own push subscriptions"
+on public.push_subscriptions for all
+using (user_id = auth.uid())
+with check (user_id = auth.uid());

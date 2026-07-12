@@ -6,7 +6,7 @@ import {
   NotebookTabs
 } from "lucide-react";
 
-export type EntryKind = "thank-you" | "noticed";
+export type EntryKind = "thank_you" | "noticed";
 export type ReactionState = "new" | "seen" | "loved";
 export type Sender = "baby" | "husband";
 export type DeliveryMode = "now" | "scheduled";
@@ -40,7 +40,8 @@ export const monthlyReflection: Review | null = null;
 export const featureRows = [
   { label: "两个人", value: "宝贝 + 老公", icon: Heart },
   { label: "送达", value: "可编辑", icon: Moon },
-  { label: "回忆", value: "永久保存", icon: Library }
+  { label: "回忆", value: "永久保存", icon: Library },
+  { label: "总结", value: "月度回顾", icon: NotebookTabs }
 ];
 
 export const directorySections = [
@@ -50,15 +51,15 @@ export const directorySections = [
 ];
 
 export function formatEntryDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
   }).format(new Date(value));
 }
 
 export function getKindLabel(kind: EntryKind) {
-  return kind === "thank-you" ? "Thank You" : "I Noticed";
+  return kind === "thank_you" ? "谢谢你" : "我看见了";
 }
 
 export function formatDeliveryTime(value: string) {
