@@ -5,10 +5,21 @@ export const metadata: Metadata = {
   title: "Gratitude",
   description: "A private daily gratitude book for two people.",
   manifest: "/manifest.json",
+  applicationName: "Gratitude",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Gratitude"
+  },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.svg", type: "image/svg+xml", sizes: "any" }
+    ],
+    apple: [{ url: "/icon.svg" }]
+  },
+  formatDetection: {
+    telephone: false
   }
 };
 
