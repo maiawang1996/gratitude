@@ -14,6 +14,8 @@ export type DeliveryMode = "now" | "scheduled";
 export type GratitudeEntry = {
   id: string;
   kind: EntryKind;
+  authorUserId?: string;
+  recipientUserId?: string;
   from: "Maia" | "Husband";
   to: "Maia" | "Husband";
   body: string;

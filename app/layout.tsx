@@ -16,7 +16,7 @@ export const metadata: Metadata = {
       { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/icon.svg", type: "image/svg+xml", sizes: "any" }
     ],
-    apple: [{ url: "/icon.svg" }]
+    apple: [{ url: "/apple-touch-icon.png" }]
   },
   formatDetection: {
     telephone: false
@@ -36,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body>{children}</body>
     </html>
   );

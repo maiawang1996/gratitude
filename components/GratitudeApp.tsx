@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Bell,
   Heart,
   Library,
   LogIn,
@@ -27,9 +26,18 @@ import {
 } from "@/lib/gratitude-data";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-const STORAGE_KEY = "gratitude-local-history";
+const LAST_EMAIL_KEY = "gratitude-last-email";
+const TRUST_DEVICE_KEY = "gratitude-trust-device";
+const DAILY_REMINDER_KEY = "gratitude-daily-reminder";
 const ROLE_BABY = "baby";
 const ROLE_HUSBAND = "husband";
+const LOVE_START_DATE = "2017-09-12";
+const MARRIAGE_START_DATE = "2023-05-22";
+const BABY_BIRTHDAY = { month: 12, day: 16, label: "宝贝" };
+const HUSBAND_BIRTHDAY = { month: 8, day: 25, label: "老公" };
+const UPCOMING_REMINDER_WINDOW_DAYS = 30;
+const hourOptions = Array.from({ length: 16 }, (_, index) => String(index + 8).padStart(2, "0"));
+const minuteOptions = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const babyEmail = process.env.NEXT_PUBLIC_BABY_EMAIL?.trim().toLowerCase() ?? "";
 const husbandEmail = process.env.NEXT_PUBLIC_HUSBAND_EMAIL?.trim().toLowerCase() ?? "";
 const coupleIdFallback = process.env.NEXT_PUBLIC_COUPLE_ID?.trim() ?? "";
@@ -67,7 +75,7 @@ export function GratitudeApp() {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | null>(null);
   const [note, setNote] = useState("");
   const [historyEntries, setHistoryEntries] = useState<GratitudeEntry[]>(entries);
-  const [deliveryTime] = useState(defaultDeliveryTime);
+  const [deliveryTime, setDeliveryTime] = useState(defaultDeliveryTime);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -82,21 +90,38 @@ export function GratitudeApp() {
   const [saveStatus, setSaveStatus] = useState("");
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<GratitudeEntry | null>(null);
   const [sendSuccessVisible, setSendSuccessVisible] = useState(false);
+  const [sendSuccessMode, setSendSuccessMode] = useState<DeliveryMode>("now");
   const [todayFeedbackPulse, setTodayFeedbackPulse] = useState<"seen" | "loved" | null>(null);
   const [todayFeedbackOverlay, setTodayFeedbackOverlay] = useState<"seen" | "loved" | null>(null);
   const [pushStatus, setPushStatus] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [trustThisDevice, setTrustThisDevice] = useState(true);
+  const [dailyReminderVisible, setDailyReminderVisible] = useState(false);
+  const [featureRowsExpanded, setFeatureRowsExpanded] = useState(false);
+  const [birthdayPanelExpanded, setBirthdayPanelExpanded] = useState(false);
 
   const readableDeliveryTime = formatDeliveryTime(deliveryTime);
   const currentRole = resolveRole(currentUserEmail);
   const currentRoleLabel = currentRole === ROLE_BABY ? "宝贝" : currentRole === ROLE_HUSBAND ? "老公" : "";
   const myName = currentMemberName || (currentRole === ROLE_BABY ? "Maia" : currentRole === ROLE_HUSBAND ? "Husband" : "");
-  const sentEntries = historyEntries.filter((item) => item.from === myName);
-  const receivedEntries = historyEntries.filter((item) => item.to === myName);
+  const visibleHistoryEntries = historyEntries.filter((item) => {
+    if (item.from === myName) return true;
+    return isDeliveredForViewer(item);
+  });
+  const sentEntries = visibleHistoryEntries.filter((item) => item.from === myName);
+  const receivedEntries = visibleHistoryEntries.filter((item) => item.to === myName);
   const saveLabel = "发送爱意";
   const todayKey = formatLocalEntryDate(new Date());
   const todayEntries = receivedEntries.filter((item) => item.writtenAt.slice(0, 10) === todayKey);
   const todayFeedbackEntry = todayEntries[0] ?? null;
+  const loveDuration = formatRelationshipDuration(LOVE_START_DATE);
+  const marriageDuration = formatRelationshipDuration(MARRIAGE_START_DATE);
+  const upcomingReminder = getUpcomingReminder(new Date());
+  const monthlyReview = buildMonthlyReview({
+    sentEntries,
+    receivedEntries,
+    now: new Date()
+  });
 
   const triggerTodayFeedback = async (reaction: "seen" | "loved") => {
     if (!todayFeedbackEntry) return;
@@ -160,6 +185,15 @@ export function GratitudeApp() {
         return;
       }
 
+      const scheduledDeliverAt =
+        deliveryMode === "scheduled" ? buildScheduledDeliverAt(createdAt, deliveryTime) : null;
+
+      if (deliveryMode === "scheduled" && !scheduledDeliverAt) {
+        setSaveStatus("定时已过");
+        setAuthError("请选择今天稍后的送达时间。");
+        return;
+      }
+
       const payload = {
         couple_id: activeCoupleId,
         author_id: activeCurrentUserId,
@@ -167,8 +201,7 @@ export function GratitudeApp() {
         kind,
         body: note.trim(),
         local_entry_date: formatLocalEntryDate(createdAt),
-        deliver_at:
-          deliveryMode === "now" ? createdAt.toISOString() : new Date(createdAt.getTime() + 60 * 60 * 1000).toISOString(),
+        deliver_at: deliveryMode === "now" ? createdAt.toISOString() : scheduledDeliverAt,
         delivered_at: deliveryMode === "now" ? createdAt.toISOString() : null
       };
 
@@ -191,20 +224,23 @@ export function GratitudeApp() {
         partnerRoleLabel
       );
       setHistoryEntries((current) => [savedEntry, ...current]);
-      void fetch("/api/push/notify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          recipientId: partnerUserId,
-          title: kind === "thank_you" ? "收到一条谢谢你" : "收到一条我看见了",
-          message: note.trim(),
-          url: "/"
-        })
-      });
+      if (deliveryMode === "now") {
+        void fetch("/api/push/notify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            recipientId: partnerUserId,
+            title: kind === "thank_you" ? "收到一条谢谢你" : "收到一条我看见了",
+            message: note.trim(),
+            url: "/"
+          })
+        });
+      }
       setNote("");
       setDeliveryMode(null);
       setAuthError(null);
       setSaveStatus("");
+      setSendSuccessMode(deliveryMode);
       setSendSuccessVisible(true);
       window.setTimeout(() => {
         setSendSuccessVisible(false);
@@ -215,15 +251,19 @@ export function GratitudeApp() {
     }
   };
 
-  const handleDeleteEntry = async (entryId: string) => {
+  const handleDeleteEntry = async (entry: GratitudeEntry) => {
+    if (isPendingScheduledEntry(entry)) {
+      const confirmed = window.confirm("该消息还未送达，确认删除吗？");
+      if (!confirmed) return;
+    }
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.from("gratitude_entries").delete().eq("id", entryId);
+      const { error } = await supabase.from("gratitude_entries").delete().eq("id", entry.id);
       if (error) {
         setAuthError(error.message);
         return;
       }
-      setHistoryEntries((current) => current.filter((item) => item.id !== entryId));
+      setHistoryEntries((current) => current.filter((item) => item.id !== entry.id));
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "删除失败");
     }
@@ -233,6 +273,7 @@ export function GratitudeApp() {
     try {
       const supabase = getSupabaseBrowserClient();
       const now = new Date().toISOString();
+      const reactedEntry = historyEntries.find((item) => item.id === entryId) ?? null;
       const patch =
         reaction === "seen"
           ? { recipient_reaction: "seen", recipient_seen_at: now, recipient_loved_at: null }
@@ -247,41 +288,90 @@ export function GratitudeApp() {
           item.id === entryId ? { ...item, state: reaction === "seen" ? "seen" : "loved" } : item
         )
       );
+      if (reactedEntry?.authorUserId && reactedEntry.authorUserId !== currentUserId) {
+        void fetch("/api/push/notify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            recipientId: reactedEntry.authorUserId,
+            title: reaction === "seen" ? "对方已读了你的消息" : "对方喜欢了你的消息",
+            message: reactedEntry.body,
+            url: "/"
+          })
+        });
+      }
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "更新失败");
     }
   };
 
   useEffect(() => {
-    try {
-      const supabase = getSupabaseBrowserClient();
-      setAuthLoading(false);
-      supabase.auth
-        .getSession()
-        .then(({ data }) => {
-          const sessionEmail = data.session?.user.email?.toLowerCase() ?? "";
-          setCurrentUserEmail(sessionEmail);
-          setCurrentUserId(data.session?.user.id ?? "");
-        })
-        .catch((error) => {
-          setAuthError(error instanceof Error ? error.message : "Supabase 会话读取失败");
+    let active = true;
+
+    const initAuth = async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        const sessionEmail = data.session?.user.email?.toLowerCase() ?? "";
+        setCurrentUserEmail(sessionEmail);
+        setCurrentUserId(data.session?.user.id ?? "");
+        setAuthLoading(false);
+
+        const { data: subscriptionData } = supabase.auth.onAuthStateChange((_event, session) => {
+          const nextEmail = session?.user.email?.toLowerCase() ?? "";
+          setCurrentUserEmail(nextEmail);
+          setCurrentUserId(session?.user.id ?? "");
+          setAuthLoading(false);
         });
 
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-        const nextEmail = session?.user.email?.toLowerCase() ?? "";
-        setCurrentUserEmail(nextEmail);
-        setCurrentUserId(session?.user.id ?? "");
+        return () => {
+          subscriptionData.subscription.unsubscribe();
+        };
+      } catch (error) {
+        if (!active) return;
+        setAuthError(error instanceof Error ? error.message : "Supabase 初始化失败");
         setAuthLoading(false);
-      });
+      }
+    };
 
-      return () => {
-        data.subscription.unsubscribe();
-      };
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Supabase 初始化失败");
-      setAuthLoading(false);
+    let cleanup: (() => void) | undefined;
+    void initAuth().then((result) => {
+      cleanup = result ?? undefined;
+    });
+
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(TRUST_DEVICE_KEY);
+      if (stored !== null) {
+        setTrustThisDevice(stored === "true");
+      }
+    } catch {
+      // Ignore storage errors.
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentUserEmail) return;
+    const today = formatLocalEntryDate(new Date());
+    const hour = new Date().getHours();
+    if (hour < 20) return;
+    if (historyEntries.some((item) => item.writtenAt.slice(0, 10) === today)) return;
+    try {
+      const remembered = window.localStorage.getItem(DAILY_REMINDER_KEY);
+      if (remembered === today) return;
+      window.localStorage.setItem(DAILY_REMINDER_KEY, today);
+    } catch {
+      // Ignore storage errors.
+    }
+    setDailyReminderVisible(true);
+  }, [currentUserEmail, historyEntries]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -343,6 +433,16 @@ export function GratitudeApp() {
       }
       setCurrentUserEmail(data.user?.email?.toLowerCase() ?? authEmail.trim().toLowerCase());
       setSender(resolveRole(data.user?.email?.toLowerCase() ?? authEmail.trim().toLowerCase()));
+      try {
+        const nextEmail = data.user?.email?.toLowerCase() ?? authEmail.trim().toLowerCase();
+        if (trustThisDevice) {
+          window.localStorage.setItem(LAST_EMAIL_KEY, nextEmail);
+        } else {
+          window.localStorage.removeItem(LAST_EMAIL_KEY);
+        }
+      } catch {
+        // Ignore storage write errors.
+      }
       setAuthPassword("");
     } finally {
       setAuthLoading(false);
@@ -367,6 +467,13 @@ export function GratitudeApp() {
       setPushStatus("");
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         setPushStatus("当前浏览器不支持提醒。");
+        return;
+      }
+
+      const isLocalhost =
+        window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      if (isLocalhost) {
+        setPushStatus("本地开发环境暂时不启用提醒。");
         return;
       }
 
@@ -429,11 +536,67 @@ export function GratitudeApp() {
   }, [currentUserEmail]);
 
   useEffect(() => {
+    if (authEmail) return;
+    try {
+      const storedEmail = window.localStorage.getItem(LAST_EMAIL_KEY)?.trim().toLowerCase() ?? "";
+      if (storedEmail) {
+        setAuthEmail(storedEmail);
+        setSender(resolveRole(storedEmail));
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [authEmail]);
+
+  useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+
+    const isLocalhost =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    if (isLocalhost) {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          void registration.unregister();
+        });
+      });
+      return;
+    }
+
     navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   }, []);
 
-  const historyCount = historyEntries.length;
+  useEffect(() => {
+    if (!currentUserEmail) {
+      setPushEnabled(false);
+      return;
+    }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushEnabled(false);
+      return;
+    }
+
+    let active = true;
+
+    const syncPushState = async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = registration ? await registration.pushManager.getSubscription() : null;
+        if (!active) return;
+        setPushEnabled(Boolean(subscription));
+      } catch {
+        if (!active) return;
+        setPushEnabled(false);
+      }
+    };
+
+    void syncPushState();
+
+    return () => {
+      active = false;
+    };
+  }, [currentUserEmail]);
+
   const memoryEntries = historyEntries;
 
   if (authLoading) {
@@ -441,7 +604,8 @@ export function GratitudeApp() {
       <main className="warm-shell min-h-screen bg-paper text-ink">
         <div className="mx-auto flex min-h-screen w-full max-w-[520px] items-center justify-center px-4">
           <div className="glass-panel w-full rounded-[28px] p-5 text-center text-sm text-[#8f7568]">
-            正在检查登录状态...
+            <div className="mx-auto mb-3 h-12 w-12 animate-pulse rounded-full bg-[#fff0e4]" />
+            正在打开 Gratitude...
           </div>
         </div>
       </main>
@@ -486,6 +650,26 @@ export function GratitudeApp() {
               </label>
             </div>
 
+            <label className="mt-4 flex items-start gap-3 rounded-[22px] bg-[#fff7ef] p-4">
+              <input
+                checked={trustThisDevice}
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setTrustThisDevice(next);
+                  try {
+                    window.localStorage.setItem(TRUST_DEVICE_KEY, String(next));
+                  } catch {
+                    // Ignore storage errors.
+                  }
+                }}
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-[#d8c3b2] text-[#f39a78] focus:ring-[#f39a78]"
+              />
+              <span className="text-sm leading-6 text-[#6f5c52]">
+                这台是我的设备，保持登录状态，减少下次打开时的等待。
+              </span>
+            </label>
+
             {authError ? <p className="mt-3 text-sm text-[#c45f47]">{authError}</p> : null}
 
             {!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? (
@@ -520,36 +704,75 @@ export function GratitudeApp() {
           <>
             <section className="pt-5">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFeatureRowsExpanded((current) => !current)}
+                  className="flex min-w-0 items-center gap-3 text-left"
+                >
                   <div className="mt-1 grid h-14 w-14 shrink-0 place-items-center rounded-[22px] bg-[#fff6ee] shadow-[0_10px_22px_rgba(184,113,93,0.12)]">
                     <Heart className="h-7 w-7 fill-[#f39a78] stroke-[#f39a78]" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <h1 className="text-[2rem] font-semibold leading-none tracking-[0.01em]">Gratitude</h1>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-[2rem] font-semibold leading-none tracking-[0.01em]">Gratitude</h1>
+                      <span className="pt-0.5 text-sm text-[#8f7568]">{featureRowsExpanded ? "▴" : "▾"}</span>
+                    </div>
                     <p className="mt-1 text-[0.92rem] text-[#8f7568]">
                       只属于你和我 <span className="text-[#f39a78]">❤</span>
                     </p>
                   </div>
-                </div>
-                <div className="rounded-full bg-white/70 px-2 py-1 shadow-sm">
-                  <AvatarStack />
+                </button>
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setBirthdayPanelExpanded((current) => !current)}
+                    className="rounded-full bg-white/70 px-2 py-1 shadow-sm"
+                  >
+                    <AvatarStack />
+                  </button>
+                  {birthdayPanelExpanded ? (
+                    <div className="absolute right-0 top-[calc(100%+10px)] z-20 w-max max-w-[220px] rounded-[22px] border border-[#eadfce] bg-[#fffdf9]/98 p-3 shadow-[0_18px_36px_rgba(121,90,68,0.16)] backdrop-blur-xl">
+                      <p className="text-[0.78rem] font-medium text-[#8f7568]">生日</p>
+                      <div className="mt-2 space-y-2 text-sm text-ink">
+                        <div className="rounded-[16px] bg-[#fff6ee] px-3 py-2 leading-none whitespace-nowrap">👸 宝贝 · 12 月 16 日</div>
+                        <div className="rounded-[16px] bg-[#fff6ee] px-3 py-2 leading-none whitespace-nowrap">🧸 老公 · 8 月 25 日</div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-4 gap-1.5">
-                {featureRows.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-[22px] border border-white/75 bg-white/50 px-2 py-2 shadow-[0_10px_18px_rgba(184,113,93,0.06)]"
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <item.icon className="mb-1.5 h-5 w-5 text-[#f1a06f]" aria-hidden="true" />
-                      <p className="text-[0.7rem] font-medium text-[#6f5c52]">{item.label}</p>
-                      <p className="mt-0.5 text-[0.74rem] font-semibold leading-tight text-ink">{item.value}</p>
+              {featureRowsExpanded ? (
+                <div className="mt-4 grid grid-cols-4 gap-1.5">
+                  {featureRows.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-[22px] border border-white/75 bg-white/50 px-2 py-2 shadow-[0_10px_18px_rgba(184,113,93,0.06)]"
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        <item.icon className="mb-1.5 h-5 w-5 text-[#f1a06f]" aria-hidden="true" />
+                        <p className="text-[0.7rem] font-medium text-[#6f5c52]">{item.label}</p>
+                        <p className="mt-0.5 text-[0.74rem] font-semibold leading-tight text-ink">{item.value}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <CountWidget
+                  title="恋爱时长 2017.09.12"
+                  value={loveDuration.primary}
+                  accent="love"
+                />
+                <CountWidget
+                  title="婚姻时长 2023.05.22"
+                  value={marriageDuration.primary}
+                  accent="marriage"
+                />
               </div>
+
+              {upcomingReminder ? <BirthdayWidget reminder={upcomingReminder} /> : null}
             </section>
 
             {todayEntries.length > 0 ? (
@@ -652,17 +875,55 @@ export function GratitudeApp() {
                     active={deliveryMode === "now"}
                     icon="⚡"
                     title="立即送达"
-                    subtitle="马上出现"
+                    subtitle="现在送出"
                     onClick={() => setDeliveryMode("now")}
                   />
                   <ScheduleCard
                     active={deliveryMode === "scheduled"}
                     icon="🌙"
                     title="定时送达"
-                    subtitle={`每天 ${readableDeliveryTime}`}
+                    subtitle="选择今天时间"
                     onClick={() => setDeliveryMode("scheduled")}
                   />
                 </div>
+                {deliveryMode === "scheduled" ? (
+                  <div className="mt-2.5 rounded-[20px] border border-[#eadfce] bg-[#fffaf4] px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[0.86rem] font-medium text-[#8f7568]">今天送达时间</p>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={deliveryTime.slice(0, 2)}
+                          onChange={(event) =>
+                            setDeliveryTime(`${event.target.value}:${deliveryTime.slice(3, 5)}`)
+                          }
+                          className="rounded-[14px] border border-[#ead8c9] bg-white px-2.5 py-2 text-sm font-semibold text-ink outline-none focus:border-[#f2a36f] focus:ring-4 focus:ring-[#f2a36f]/15"
+                        >
+                          {hourOptions.map((hour) => (
+                            <option key={hour} value={hour}>
+                              {hour}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm font-semibold text-[#8f7568]">:</span>
+                        <select
+                          value={deliveryTime.slice(3, 5)}
+                          onChange={(event) =>
+                            setDeliveryTime(`${deliveryTime.slice(0, 2)}:${event.target.value}`)
+                          }
+                          className="rounded-[14px] border border-[#ead8c9] bg-white px-2.5 py-2 text-sm font-semibold text-ink outline-none focus:border-[#f2a36f] focus:ring-4 focus:ring-[#f2a36f]/15"
+                        >
+                          {minuteOptions.map((minute) => (
+                            <option key={minute} value={minute}>
+                              {minute}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-[#8f7568]">选择立即送达后，对方会马上收到这句话。</p>
+                )}
               </div>
 
               <button
@@ -716,7 +977,7 @@ export function GratitudeApp() {
                 onDeleteEntry={handleDeleteEntry}
               />
               <MemoryCard title="本周回顾" subtitle="周一到周日" emptyText="目前还没有生成周回顾。" />
-              <MemoryCard title="月度回顾" subtitle="按月回看" emptyText="目前还没有可阅读的月度回顾。" />
+              <MonthlyReviewCard review={monthlyReview} />
             </section>
           </>
         ) : (
@@ -733,15 +994,12 @@ export function GratitudeApp() {
             <section className="mt-4 space-y-3">
               <div className="glass-panel rounded-[28px] p-4">
                 <p className="text-sm text-[#8f7568]">当前身份</p>
-                <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="mt-2">
                   <div>
                     <p className="text-[1.2rem] font-semibold text-ink">{currentRoleLabel || "未识别"}</p>
                     <p className="mt-1 text-sm text-[#8f7568]">{currentUserEmail}</p>
                   </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-[20px] bg-[#fff4ea]">
-                  <LogIn className="h-6 w-6 text-[#f39a78]" aria-hidden="true" />
                 </div>
-              </div>
               </div>
 
               <div className="glass-panel rounded-[28px] p-4">
@@ -815,7 +1073,7 @@ export function GratitudeApp() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await handleDeleteEntry(selectedHistoryEntry.id);
+                    await handleDeleteEntry(selectedHistoryEntry);
                     setSelectedHistoryEntry(null);
                   }}
                   className="rounded-[18px] bg-[#fff2e8] px-4 py-2 text-sm font-semibold text-[#c45f47]"
@@ -829,21 +1087,25 @@ export function GratitudeApp() {
       ) : null}
 
       {sendSuccessVisible ? (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-[#fffaf4]/96 px-4">
-          <div className="flex flex-col items-center text-center">
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-[#fffdf9]/98 px-4 backdrop-blur-[2px]">
+          <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
             <div className="animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-[#fff2e8] p-5 shadow-[0_20px_50px_rgba(244,160,111,0.18)]">
               <Sparkles className="h-12 w-12 text-[#f39a78]" aria-hidden="true" />
             </div>
-            <p className="mt-5 text-[1.6rem] font-semibold text-ink">你的爱意已经发送了</p>
-            <p className="mt-2 text-sm text-[#8f7568]">悄悄送到对方那里了</p>
+            <p className="mt-5 text-[1.6rem] font-semibold text-ink">
+              {sendSuccessMode === "scheduled" ? "你的爱意即将送达" : "你的爱意已经发送了"}
+            </p>
+            <p className="mt-2 text-sm text-[#8f7568]">
+              {sendSuccessMode === "scheduled" ? "会在你选定的时间悄悄送到对方那里" : "悄悄送到对方那里了"}
+            </p>
           </div>
         </div>
       ) : null}
 
       {todayFeedbackOverlay ? (
-        <div className="fixed inset-0 z-[66] flex items-center justify-center bg-[#fffaf4]/96 px-4">
+        <div className="fixed inset-0 z-[66] flex items-center justify-center bg-[#fffdf9]/98 px-4 backdrop-blur-[2px]">
           {todayFeedbackOverlay === "seen" ? (
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
               <div className="relative flex h-28 w-28 items-center justify-center">
                 <div className="absolute h-28 w-28 rounded-full bg-[#eef4ff] opacity-80 animate-[ping_1.1s_ease-out_infinite]" />
                 <div className="absolute h-20 w-20 rounded-full bg-[#fff] shadow-[0_20px_50px_rgba(132,162,214,0.18)] animate-[pulse_0.9s_ease-in-out_infinite]" />
@@ -853,7 +1115,7 @@ export function GratitudeApp() {
               <p className="mt-2 text-sm text-[#8f7568]">这一刻被认真收到了</p>
             </div>
           ) : (
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
               <div className="relative flex h-32 w-32 items-center justify-center">
                 <div className="absolute h-32 w-32 rounded-full bg-[#ffe9ef] opacity-70 animate-[pulse_0.8s_ease-in-out_infinite]" />
                 <div className="absolute h-24 w-24 rounded-full bg-[#fff2f5] shadow-[0_20px_50px_rgba(244,111,146,0.18)] animate-[spin_1.4s_linear_infinite]" />
@@ -863,6 +1125,21 @@ export function GratitudeApp() {
               <p className="mt-2 text-sm text-[#8f7568]">这份心意正在发亮</p>
             </div>
           )}
+        </div>
+      ) : null}
+
+      {dailyReminderVisible ? (
+        <div className="fixed inset-x-0 top-4 z-[67] px-4">
+          <div className="mx-auto flex w-full max-w-[520px] items-center justify-between gap-3 rounded-[22px] bg-[#fff7ef] px-4 py-3 text-sm text-[#6f5c52] shadow-[0_16px_32px_rgba(150,115,83,0.12)]">
+            <span>今天还没写一句，今晚 8 点后记得留一点给彼此。</span>
+            <button
+              type="button"
+              onClick={() => setDailyReminderVisible(false)}
+              className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#c67c4e]"
+            >
+              知道了
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -1021,6 +1298,110 @@ function MemoryCard({
   );
 }
 
+function CountWidget({
+  title,
+  value,
+  accent
+}: {
+  title: string;
+  value: string;
+  accent: "love" | "marriage";
+}) {
+  const palette =
+    accent === "love"
+      ? {
+          shell: "border-[#f1d7cd] bg-[linear-gradient(160deg,rgba(255,250,246,0.98),rgba(255,241,232,0.96))]",
+          badge: "bg-[#fff5ee] text-[#d78d72]",
+          glow: "bg-[radial-gradient(circle_at_top_right,rgba(244,160,111,0.18),transparent_58%)]",
+          mark: "❤"
+        }
+      : {
+          shell: "border-[#e3dccf] bg-[linear-gradient(160deg,rgba(255,252,247,0.98),rgba(246,240,231,0.96))]",
+          badge: "bg-[#f8f2e8] text-[#baa074]",
+          glow: "bg-[radial-gradient(circle_at_top_right,rgba(210,188,141,0.2),transparent_58%)]",
+          mark: "✦"
+        };
+
+  return (
+    <div className={`relative overflow-hidden rounded-[22px] border px-3 py-2.5 shadow-[0_10px_18px_rgba(184,113,93,0.07)] ${palette.shell}`}>
+      <div className={`pointer-events-none absolute inset-0 ${palette.glow}`} />
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[0.67rem] font-medium leading-none text-[#8f7568]">{title}</p>
+          <p className="mt-1 text-[1.02rem] font-semibold leading-none text-ink">{value}</p>
+        </div>
+        <div className={`shrink-0 rounded-full px-2 py-0.5 text-[0.7rem] font-semibold ${palette.badge}`}>
+          {palette.mark}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BirthdayWidget({
+  reminder
+}: {
+  reminder: { title: string; detail: string };
+}) {
+  return (
+    <div className="mt-3 rounded-[24px] border border-[#eadfce] bg-[#fff6ee]/95 p-4 shadow-[0_10px_18px_rgba(184,113,93,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.86rem] font-medium text-[#8f7568]">近期提醒</p>
+          <p className="mt-1 text-[1.05rem] font-semibold text-ink">{reminder.title}</p>
+          <p className="mt-2 text-sm leading-6 text-[#8f7568]">{reminder.detail}</p>
+        </div>
+        <div className="rounded-full bg-white px-3 py-2 text-xl leading-none shadow-sm">🎂</div>
+      </div>
+    </div>
+  );
+}
+
+function MonthlyReviewCard({
+  review
+}: {
+  review: {
+    monthLabel: string;
+    sentCount: number;
+    receivedCount: number;
+    thankYouCount: number;
+    noticedCount: number;
+    recentLine: string | null;
+  };
+}) {
+  return (
+    <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <p className="text-[0.98rem] font-semibold text-ink">月度回顾</p>
+          <p className="text-xs text-[#8f7568]">{review.monthLabel}</p>
+        </div>
+        <span className="rounded-full bg-[#fff4ea] px-3 py-1 text-xs text-[#c67c4e]">自动生成</span>
+      </div>
+
+      {review.sentCount === 0 && review.receivedCount === 0 ? (
+        <p className="text-sm leading-7 text-[#8f7568]">这个月还没有内容，等你们慢慢写下来。</p>
+      ) : (
+        <div className="space-y-2.5 text-sm leading-6 text-[#6f5c52]">
+          <p>
+            这个月你们一共留下了 <span className="font-semibold text-ink">{review.sentCount + review.receivedCount}</span> 条内容，
+            其中发出了 <span className="font-semibold text-ink">{review.sentCount}</span> 条，收到了 <span className="font-semibold text-ink">{review.receivedCount}</span> 条。
+          </p>
+          <p>
+            “谢谢你” 有 <span className="font-semibold text-ink">{review.thankYouCount}</span> 条，
+            “我看见了” 有 <span className="font-semibold text-ink">{review.noticedCount}</span> 条。
+          </p>
+          {review.recentLine ? (
+            <div className="rounded-[18px] bg-[#fff6ee] px-3 py-2.5 text-ink">
+              最近的一句：{review.recentLine}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoryPanel({
   activeTab,
   onTabChange,
@@ -1036,7 +1417,7 @@ function HistoryPanel({
   receivedEntries: GratitudeEntry[];
   selectedEntryId: string | null;
   onSelectEntry: (entry: GratitudeEntry) => void;
-  onDeleteEntry: (entryId: string) => void;
+  onDeleteEntry: (entry: GratitudeEntry) => void;
 }) {
   const activeEntries = activeTab === "sent" ? sentEntries : receivedEntries;
   const [showAllEntries, setShowAllEntries] = useState(false);
@@ -1133,6 +1514,152 @@ function formatLocalEntryDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function formatRelationshipDuration(startDateText: string) {
+  const startDate = new Date(`${startDateText}T00:00:00`);
+  const now = new Date();
+  let years = now.getFullYear() - startDate.getFullYear();
+  let months = now.getMonth() - startDate.getMonth();
+  let days = now.getDate() - startDate.getDate();
+
+  if (days < 0) {
+    const previousMonthLastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    days += previousMonthLastDay;
+    months -= 1;
+  }
+
+  if (months < 0) {
+    months += 12;
+    years -= 1;
+  }
+
+  return {
+    primary: `${years} 年 ${months} 个月`,
+    secondary: `${years} 年 ${months} 个月 ${days} 天`
+  };
+}
+
+function buildScheduledDeliverAt(baseDate: Date, timeValue: string) {
+  const [hoursText, minutesText] = timeValue.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  const scheduled = new Date(baseDate);
+  scheduled.setHours(hours, minutes, 0, 0);
+
+  if (scheduled.getTime() <= baseDate.getTime()) {
+    return null;
+  }
+
+  return scheduled.toISOString();
+}
+
+function isDeliveredForViewer(entry: GratitudeEntry) {
+  return new Date(entry.deliveredAt).getTime() <= Date.now();
+}
+
+function isPendingScheduledEntry(entry: GratitudeEntry) {
+  return new Date(entry.deliveredAt).getTime() > Date.now();
+}
+
+function getUpcomingReminder(now: Date) {
+  const upcomingItems = [
+    {
+      kind: "birthday",
+      label: "宝贝的生日",
+      month: BABY_BIRTHDAY.month,
+      day: BABY_BIRTHDAY.day
+    },
+    {
+      kind: "birthday",
+      label: "老公的生日",
+      month: HUSBAND_BIRTHDAY.month,
+      day: HUSBAND_BIRTHDAY.day
+    },
+    {
+      kind: "anniversary",
+      label: "恋爱纪念日",
+      month: Number(LOVE_START_DATE.slice(5, 7)),
+      day: Number(LOVE_START_DATE.slice(8, 10))
+    },
+    {
+      kind: "anniversary",
+      label: "结婚纪念日",
+      month: Number(MARRIAGE_START_DATE.slice(5, 7)),
+      day: Number(MARRIAGE_START_DATE.slice(8, 10))
+    }
+  ]
+    .map((item) => {
+      const next = new Date(now.getFullYear(), item.month - 1, item.day);
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (next < todayStart) {
+        next.setFullYear(now.getFullYear() + 1);
+      }
+      const dayMs = 24 * 60 * 60 * 1000;
+      const daysLeft = Math.round((next.getTime() - todayStart.getTime()) / dayMs);
+      return { ...item, daysLeft };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const nextItem = upcomingItems[0];
+  if (!nextItem || nextItem.daysLeft > UPCOMING_REMINDER_WINDOW_DAYS) {
+    return null;
+  }
+
+  if (nextItem.daysLeft === 0) {
+    return {
+      title: `今天是${nextItem.label}`,
+      detail:
+        nextItem.kind === "birthday"
+          ? "别忘了今天多准备一点惊喜。"
+          : "今天值得好好纪念一下。"
+    };
+  }
+
+  return {
+    title: `快到${nextItem.label}了`,
+    detail: `还有 ${nextItem.daysLeft} 天，就是${nextItem.label}。`
+  };
+}
+
+function buildMonthlyReview({
+  sentEntries,
+  receivedEntries,
+  now
+}: {
+  sentEntries: GratitudeEntry[];
+  receivedEntries: GratitudeEntry[];
+  now: Date;
+}) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  const currentMonthEntries = [...sentEntries, ...receivedEntries]
+    .filter((item) => {
+      const time = new Date(item.writtenAt).getTime();
+      return time >= monthStart && time < monthEnd;
+    })
+    .sort((a, b) => new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime());
+
+  const monthLabel = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
+  const sentCount = currentMonthEntries.filter((item) => sentEntries.some((sent) => sent.id === item.id)).length;
+  const receivedCount = currentMonthEntries.filter((item) => receivedEntries.some((received) => received.id === item.id)).length;
+  const thankYouCount = currentMonthEntries.filter((item) => item.kind === "thank_you").length;
+  const noticedCount = currentMonthEntries.filter((item) => item.kind === "noticed").length;
+  const recentLine = currentMonthEntries[0]?.body ?? null;
+
+  return {
+    monthLabel,
+    sentCount,
+    receivedCount,
+    thankYouCount,
+    noticedCount,
+    recentLine
+  };
+}
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -1155,6 +1682,8 @@ function mapEntryRowToUi(
   return {
     id: row.id,
     kind: row.kind,
+    authorUserId: row.author_id,
+    recipientUserId: row.recipient_id,
     from: (row.author_id === currentUserId ? currentMemberName : partnerMemberName) as GratitudeEntry["from"],
     to: (row.recipient_id === currentUserId ? currentMemberName : partnerMemberName) as GratitudeEntry["to"],
     body: row.body,
