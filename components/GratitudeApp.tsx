@@ -111,9 +111,8 @@ export function GratitudeApp() {
   const sentEntries = visibleHistoryEntries.filter((item) => item.from === myName);
   const receivedEntries = visibleHistoryEntries.filter((item) => item.to === myName);
   const saveLabel = "发送爱意";
-  const todayKey = formatLocalEntryDate(new Date());
-  const todayEntries = receivedEntries.filter((item) => item.writtenAt.slice(0, 10) === todayKey);
-  const todayFeedbackEntry = todayEntries[0] ?? null;
+  const pendingReceivedEntries = receivedEntries.filter((item) => item.state === "new");
+  const todayFeedbackEntry = pendingReceivedEntries[0] ?? null;
   const loveDuration = formatRelationshipDuration(LOVE_START_DATE);
   const marriageDuration = formatRelationshipDuration(MARRIAGE_START_DATE);
   const upcomingReminder = getUpcomingReminder(new Date());
@@ -775,7 +774,7 @@ export function GratitudeApp() {
               {upcomingReminder ? <BirthdayWidget reminder={upcomingReminder} /> : null}
             </section>
 
-            {todayEntries.length > 0 ? (
+            {pendingReceivedEntries.length > 0 ? (
               <section className="mt-4 glass-panel rounded-[28px] p-3">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
@@ -814,7 +813,7 @@ export function GratitudeApp() {
                 </div>
 
                 <div className="space-y-2">
-                  {todayEntries.map((item) => (
+                  {pendingReceivedEntries.map((item) => (
                     <div key={item.id} className="rounded-[24px] bg-[#fff6ee] p-3">
                       <p className="mt-1 break-words whitespace-pre-wrap text-[1rem] leading-7 text-ink">
                         {item.body}
@@ -938,7 +937,7 @@ export function GratitudeApp() {
               {authError ? <p className="mt-3 text-sm leading-6 text-[#c45f47]">{authError}</p> : null}
             </section>
 
-            {todayEntries.length === 0 ? (
+            {pendingReceivedEntries.length === 0 ? (
               <section className="mt-4 glass-panel rounded-[28px] p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
@@ -1367,6 +1366,19 @@ function MonthlyReviewCard({
     thankYouCount: number;
     noticedCount: number;
     recentLine: string | null;
+    reflectionTitle: string;
+    reflectionBody: string;
+    rhythmLine: string;
+    highlightDayLine: string;
+    mutualLine: string;
+    spotlightLines: string[];
+    calendarDays: Array<{
+      key: string;
+      dayNumber: number | null;
+      hasBaby: boolean;
+      hasHusband: boolean;
+      isCurrentMonth: boolean;
+    }>;
   };
 }) {
   return (
@@ -1383,17 +1395,59 @@ function MonthlyReviewCard({
         <p className="text-sm leading-7 text-[#8f7568]">这个月还没有内容，等你们慢慢写下来。</p>
       ) : (
         <div className="space-y-2.5 text-sm leading-6 text-[#6f5c52]">
-          <p>
-            这个月你们一共留下了 <span className="font-semibold text-ink">{review.sentCount + review.receivedCount}</span> 条内容，
-            其中发出了 <span className="font-semibold text-ink">{review.sentCount}</span> 条，收到了 <span className="font-semibold text-ink">{review.receivedCount}</span> 条。
-          </p>
-          <p>
-            “谢谢你” 有 <span className="font-semibold text-ink">{review.thankYouCount}</span> 条，
-            “我看见了” 有 <span className="font-semibold text-ink">{review.noticedCount}</span> 条。
-          </p>
-          {review.recentLine ? (
-            <div className="rounded-[18px] bg-[#fff6ee] px-3 py-2.5 text-ink">
-              最近的一句：{review.recentLine}
+          <div className="rounded-[20px] bg-[#fff6ee] p-3.5">
+            <p className="text-[0.92rem] font-semibold text-ink">{review.reflectionTitle}</p>
+            <p className="mt-2 text-sm leading-7 text-[#6f5c52]">{review.reflectionBody}</p>
+          </div>
+
+          <div className="rounded-[20px] bg-[#fff8f1] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[0.86rem] font-medium text-[#8f7568]">发送日历</p>
+              <div className="flex items-center gap-3 text-[0.72rem] text-[#8f7568]">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#f4a06f]" />
+                  宝贝
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#c9ab7b]" />
+                  老公
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-y-2 text-center text-[0.68rem] text-[#b09583]">
+              {["日", "一", "二", "三", "四", "五", "六"].map((label) => (
+                <div key={label} className="font-medium">
+                  {label}
+                </div>
+              ))}
+              {review.calendarDays.map((day) => (
+                <div
+                  key={day.key}
+                  className={`mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-[14px] ${
+                    day.isCurrentMonth ? "bg-[#fffdf9]" : "bg-transparent"
+                  }`}
+                >
+                  <span className={day.isCurrentMonth ? "text-[#6f5c52]" : "text-transparent"}>{day.dayNumber ?? ""}</span>
+                  <span className="mt-0.5 flex items-center gap-1">
+                    {day.hasBaby ? <span className="h-1.5 w-1.5 rounded-full bg-[#f4a06f]" /> : null}
+                    {day.hasHusband ? <span className="h-1.5 w-1.5 rounded-full bg-[#c9ab7b]" /> : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5 rounded-[20px] bg-[#fffdf9] px-3 py-3">
+            <p>{review.rhythmLine}</p>
+            <p>{review.highlightDayLine}</p>
+            <p>{review.mutualLine}</p>
+          </div>
+          {review.spotlightLines.length > 0 ? (
+            <div className="space-y-2">
+              {review.spotlightLines.map((line, index) => (
+                <div key={`${line}-${index}`} className="rounded-[18px] bg-[#fff6ee] px-3 py-2.5 text-ink">
+                  {line}
+                </div>
+              ))}
             </div>
           ) : null}
         </div>
@@ -1649,6 +1703,97 @@ function buildMonthlyReview({
   const thankYouCount = currentMonthEntries.filter((item) => item.kind === "thank_you").length;
   const noticedCount = currentMonthEntries.filter((item) => item.kind === "noticed").length;
   const recentLine = currentMonthEntries[0]?.body ?? null;
+  const uniqueDays = Array.from(new Set(currentMonthEntries.map((item) => new Date(item.writtenAt).getDate()))).sort((a, b) => a - b);
+  const dayMap = new Map<number, { hasBaby: boolean; hasHusband: boolean }>();
+  const dayEntryCount = new Map<number, number>();
+  const sentDaySet = new Set<number>();
+  const receivedDaySet = new Set<number>();
+  const sentThisMonth = currentMonthEntries.filter((item) => sentEntries.some((sent) => sent.id === item.id));
+  const receivedThisMonth = currentMonthEntries.filter((item) => receivedEntries.some((received) => received.id === item.id));
+
+  currentMonthEntries.forEach((item) => {
+    const dayNumber = new Date(item.writtenAt).getDate();
+    const current = dayMap.get(dayNumber) ?? { hasBaby: false, hasHusband: false };
+    if (item.from === "Maia") current.hasBaby = true;
+    if (item.from === "Husband") current.hasHusband = true;
+    dayMap.set(dayNumber, current);
+    dayEntryCount.set(dayNumber, (dayEntryCount.get(dayNumber) ?? 0) + 1);
+  });
+
+  sentThisMonth.forEach((item) => {
+    sentDaySet.add(new Date(item.writtenAt).getDate());
+  });
+
+  receivedThisMonth.forEach((item) => {
+    receivedDaySet.add(new Date(item.writtenAt).getDate());
+  });
+
+  const firstWeekday = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
+    if (index < firstWeekday) {
+      return {
+        key: `blank-${index}`,
+        dayNumber: null,
+        hasBaby: false,
+        hasHusband: false,
+        isCurrentMonth: false
+      };
+    }
+
+    const dayNumber = index - firstWeekday + 1;
+    const flags = dayMap.get(dayNumber) ?? { hasBaby: false, hasHusband: false };
+    return {
+      key: `day-${dayNumber}`,
+      dayNumber,
+      hasBaby: flags.hasBaby,
+      hasHusband: flags.hasHusband,
+      isCurrentMonth: true
+    };
+  });
+
+  const activeDayCount = uniqueDays.length;
+  const longestStreak = getLongestStreak(uniqueDays);
+  const busiestDayEntry = Array.from(dayEntryCount.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
+  const sharedDays = Array.from(sentDaySet).filter((day) => receivedDaySet.has(day)).sort((a, b) => a - b);
+  const spotlightEntry = currentMonthEntries.find((item) => item.body.trim().length >= 12) ?? currentMonthEntries[0] ?? null;
+  const closingEntry = currentMonthEntries[currentMonthEntries.length - 1] ?? null;
+  const busiestDayLine = busiestDayEntry
+    ? `${monthLabel}里最热闹的是 ${busiestDayEntry[0]} 号，那天你们一共留下了 ${busiestDayEntry[1]} 条内容。`
+    : `${monthLabel}里还没有特别集中的记录日。`;
+  const balanceLine =
+    thankYouCount >= noticedCount
+      ? `这个月你们更常把“谢谢你”说出口，感谢被认真地留了下来。`
+      : `这个月你们更常写下“我看见了”，彼此的状态被更细致地接住了。`;
+  const rhythmLine =
+    activeDayCount === 0
+      ? "这个月还没有留下记录。"
+      : longestStreak > 1
+        ? `这个月有 ${activeDayCount} 天留下了内容，最长连续记录了 ${longestStreak} 天。`
+        : `这个月有 ${activeDayCount} 天留下了内容，节奏还比较松，但每一次记录都被留下来了。`;
+  const reflectionTitle =
+    thankYouCount === 0 && noticedCount === 0
+      ? "这个月还很安静"
+      : thankYouCount >= noticedCount
+        ? "这个月，你们把感谢说得更多了一点"
+        : "这个月，你们更常认真看见彼此";
+  const reflectionBody =
+    currentMonthEntries.length === 0
+      ? "还没有足够内容生成回顾。"
+      : `${balanceLine}${spotlightEntry ? ` 这个月很像被这句话轻轻记住了：“${spotlightEntry.body}”` : ""}`;
+  const mutualLine =
+    currentMonthEntries.length === 0
+      ? "等写下第一句之后，这里会慢慢长成真正的回顾。"
+      : sharedDays.length > 0
+        ? `这个月有 ${sharedDays.length} 天是你来我往的双向表达，不只是被看见，也有被回应。`
+        : "这个月的内容还没有落在同一天彼此回应，但每一条都已经在关系里留下痕迹。";
+  const thankYouSpotlight = currentMonthEntries.find((item) => item.kind === "thank_you")?.body ?? null;
+  const noticedSpotlight = currentMonthEntries.find((item) => item.kind === "noticed")?.body ?? null;
+  const spotlightLines = [
+    thankYouSpotlight ? `这个月的一句谢谢：${thankYouSpotlight}` : null,
+    noticedSpotlight ? `这个月的一句看见：${noticedSpotlight}` : null,
+    closingEntry ? `这个月最早留下的一句：${closingEntry.body}` : null
+  ].filter((item): item is string => Boolean(item));
 
   return {
     monthLabel,
@@ -1656,8 +1801,32 @@ function buildMonthlyReview({
     receivedCount,
     thankYouCount,
     noticedCount,
-    recentLine
+    recentLine,
+    reflectionTitle,
+    reflectionBody,
+    rhythmLine,
+    highlightDayLine: busiestDayLine,
+    mutualLine,
+    spotlightLines,
+    calendarDays
   };
+}
+
+function getLongestStreak(days: number[]) {
+  if (days.length === 0) return 0;
+  let longest = 1;
+  let current = 1;
+
+  for (let index = 1; index < days.length; index += 1) {
+    if (days[index] === days[index - 1] + 1) {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 1;
+    }
+  }
+
+  return longest;
 }
 
 function urlBase64ToUint8Array(base64String: string) {
