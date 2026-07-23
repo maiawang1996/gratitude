@@ -72,8 +72,8 @@ type GratitudeEntryRow = {
 export function GratitudeApp() {
   const [tab, setTab] = useState<"home" | "memory" | "me">("home");
   const [historyTab, setHistoryTab] = useState<"sent" | "received">("received");
-  const [mood, setMood] = useState<"celebrating" | "soft" | "blank" | "tired" | null>(null);
-  const [moodOverlay, setMoodOverlay] = useState<"celebrating" | "soft" | "blank" | "tired" | null>(null);
+  const [mood, setMood] = useState<"celebrating" | "soft" | "lovey" | "sleepy" | "blank" | "quiet" | "tired" | null>(null);
+  const [moodOverlay, setMoodOverlay] = useState<"celebrating" | "soft" | "lovey" | "sleepy" | "blank" | "quiet" | "tired" | null>(null);
   const [kind, setKind] = useState<EntryKind>("thank_you");
   const [sender, setSender] = useState<Sender | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | null>(null);
@@ -131,10 +131,13 @@ export function GratitudeApp() {
   });
   const overallStats = buildOverallStats(historyEntries);
   const moodItems = [
-    { key: "celebrating" as const, emoji: "🥳", caption: "哇！今天是心情超好的一天", overlayTitle: "今天亮晶晶的", overlayBody: "把开心轻轻放在这里了" },
-    { key: "soft" as const, emoji: "😊", caption: "嘿嘿，今天心情不错哦～", overlayTitle: "今天很温柔", overlayBody: "这一刻被安安静静地记住了" },
-    { key: "blank" as const, emoji: "🫥", caption: "嗯…今天有一点放空…", overlayTitle: "今天想慢一点", overlayBody: "就这样发会儿呆也没关系" },
-    { key: "tired" as const, emoji: "😣", caption: "今天有点累了，要多休息照顾自己呀", overlayTitle: "今天辛苦了", overlayBody: "先抱一抱自己，再慢慢往前走" }
+    { key: "celebrating" as const, emoji: "🥳", overlayTitle: "哇！今天是心情超好的一天", overlayBody: "把开心轻轻放在这里了" },
+    { key: "lovey" as const, emoji: "🥰", overlayTitle: "今天心里甜甜的", overlayBody: "有一点想抱抱，也有一点想撒娇" },
+    { key: "soft" as const, emoji: "😉", overlayTitle: "嘿嘿，今天心情不错哦～", overlayBody: "这一刻被安安静静地记住了" },
+    { key: "blank" as const, emoji: "🫥", overlayTitle: "嗯…今天有一点放空…", overlayBody: "就这样发会儿呆也没关系" },
+    { key: "quiet" as const, emoji: "😶", overlayTitle: "今天安安静静的", overlayBody: "不想说太多，也可以被温柔接住" },
+    { key: "sleepy" as const, emoji: "😴", overlayTitle: "今天有点困困的", overlayBody: "先慢一点，补满元气再继续" },
+    { key: "tired" as const, emoji: "😣", overlayTitle: "今天有点累了，要多休息照顾自己呀", overlayBody: "先抱一抱自己，再慢慢往前走" }
   ];
 
   const triggerTodayFeedback = async (reaction: "seen" | "loved") => {
@@ -773,32 +776,6 @@ export function GratitudeApp() {
                 </div>
               ) : null}
 
-              <div className="mt-3 rounded-[22px] border border-[#eadfce] bg-white/58 px-3 py-3 shadow-[0_8px_18px_rgba(184,113,93,0.06)] backdrop-blur-xl">
-                <p className="text-[0.84rem] font-medium text-[#8f7568]">今天心情怎么样？</p>
-                <div className="mt-2 grid grid-cols-4 gap-1.5">
-                  {moodItems.map((item) => (
-                    <div key={item.key} className="flex flex-col items-center text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMood(item.key);
-                          setMoodOverlay(item.key);
-                          window.setTimeout(() => setMoodOverlay(null), 1100);
-                        }}
-                        className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
-                          mood === item.key
-                            ? "border-[#efb08c] bg-[#fff2e8] shadow-[0_6px_14px_rgba(184,113,93,0.12)]"
-                            : "border-[#efe2d6] bg-white/75"
-                        }`}
-                      >
-                        {item.emoji}
-                      </button>
-                      <p className="mt-1.5 text-[0.62rem] leading-[1.25] text-[#9a7f71]">{item.caption}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <CountWidget
                   title="恋爱时长 2017.09.12"
@@ -810,6 +787,30 @@ export function GratitudeApp() {
                   value={marriageDuration.primary}
                   accent="marriage"
                 />
+              </div>
+
+              <div className="mt-3 rounded-[22px] border border-[#eadfce] bg-white/58 px-3 py-3 shadow-[0_8px_18px_rgba(184,113,93,0.06)] backdrop-blur-xl">
+                <p className="text-[0.84rem] font-medium text-[#8f7568]">今天心情怎么样？</p>
+                <div className="mt-2 grid grid-cols-7 gap-1.5">
+                  {moodItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setMood(item.key);
+                        setMoodOverlay(item.key);
+                        window.setTimeout(() => setMoodOverlay(null), 1100);
+                      }}
+                      className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
+                        mood === item.key
+                          ? "border-[#efb08c] bg-[#fff2e8] shadow-[0_6px_14px_rgba(184,113,93,0.12)]"
+                          : "border-[#efe2d6] bg-white/75"
+                      }`}
+                    >
+                      {item.emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {upcomingReminder ? <BirthdayWidget reminder={upcomingReminder} /> : null}
@@ -1181,17 +1182,35 @@ export function GratitudeApp() {
                 <div className="absolute h-28 w-28 rounded-full bg-[#fff0dc] opacity-80 animate-[ping_1.2s_ease-out_infinite]" />
                 <span className="relative text-[4rem] leading-none animate-[bounce_0.9s_ease-in-out_infinite]">🥳</span>
               </div>
-              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天亮晶晶的</p>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">哇！今天是心情超好的一天</p>
               <p className="mt-2 text-sm text-[#8f7568]">把开心轻轻放在这里了</p>
             </div>
           ) : moodOverlay === "soft" ? (
             <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
               <div className="relative flex h-28 w-28 items-center justify-center">
                 <div className="absolute h-24 w-24 rounded-full bg-[#fff4e8] opacity-85 animate-[pulse_1s_ease-in-out_infinite]" />
-                <span className="relative text-[4rem] leading-none animate-[pulse_1s_ease-in-out_infinite]">😊</span>
+                <span className="relative text-[4rem] leading-none animate-[pulse_1s_ease-in-out_infinite]">😉</span>
               </div>
-              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天很温柔</p>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">嘿嘿，今天心情不错哦～</p>
               <p className="mt-2 text-sm text-[#8f7568]">这一刻被安安静静地记住了</p>
+            </div>
+          ) : moodOverlay === "lovey" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-28 w-28 rounded-full bg-[#ffeef3] opacity-80 animate-[pulse_0.95s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[pulse_0.85s_ease-in-out_infinite]">🥰</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天心里甜甜的</p>
+              <p className="mt-2 text-sm text-[#8f7568]">有一点想抱抱，也有一点想撒娇</p>
+            </div>
+          ) : moodOverlay === "sleepy" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-24 w-24 rounded-full bg-[#f7f2ea] opacity-85 animate-[pulse_1.1s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[pulse_1.1s_ease-in-out_infinite]">😴</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天有点困困的</p>
+              <p className="mt-2 text-sm text-[#8f7568]">先慢一点，补满元气再继续</p>
             </div>
           ) : moodOverlay === "blank" ? (
             <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
@@ -1199,8 +1218,17 @@ export function GratitudeApp() {
                 <div className="absolute h-24 w-24 rounded-full bg-[#f7f2ec] opacity-90 animate-[pulse_1.2s_ease-in-out_infinite]" />
                 <span className="relative text-[4rem] leading-none animate-[pulse_1.2s_ease-in-out_infinite]">🫥</span>
               </div>
-              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天想慢一点</p>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">嗯…今天有一点放空…</p>
               <p className="mt-2 text-sm text-[#8f7568]">就这样发会儿呆也没关系</p>
+            </div>
+          ) : moodOverlay === "quiet" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-24 w-24 rounded-full bg-[#f6f1eb] opacity-85 animate-[pulse_1.15s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[pulse_1.05s_ease-in-out_infinite]">😶</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天安安静静的</p>
+              <p className="mt-2 text-sm text-[#8f7568]">不想说太多，也可以被温柔接住</p>
             </div>
           ) : (
             <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
@@ -1208,7 +1236,7 @@ export function GratitudeApp() {
                 <div className="absolute h-24 w-24 rounded-full bg-[#fff0ea] opacity-80 animate-[pulse_0.95s_ease-in-out_infinite]" />
                 <span className="relative text-[4rem] leading-none animate-[translateY(0)]">😣</span>
               </div>
-              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天辛苦了</p>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天有点累了，要多休息照顾自己呀</p>
               <p className="mt-2 text-sm text-[#8f7568]">先抱一抱自己，再慢慢往前走</p>
             </div>
           )}
@@ -1534,7 +1562,6 @@ function MonthlyReviewCard({
     rhythmLine: string;
     highlightDayLine: string;
     mutualLine: string;
-    spotlightLines: string[];
     calendarDays: Array<{
       key: string;
       dayNumber: number | null;
@@ -1626,15 +1653,6 @@ function MonthlyReviewCard({
             <p>{review.highlightDayLine}</p>
             <p>{review.mutualLine}</p>
           </div>
-          {review.spotlightLines.length > 0 ? (
-            <div className="space-y-2">
-              {review.spotlightLines.map((line, index) => (
-                <div key={`${line}-${index}`} className="rounded-[18px] bg-[#fff6ee] px-3 py-2.5 text-ink">
-                  {line}
-                </div>
-              ))}
-            </div>
-          ) : null}
         </div>
       )}
     </div>
@@ -1956,7 +1974,6 @@ function buildMonthlyReview({
   const busiestDayEntry = Array.from(dayEntryCount.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
   const sharedDays = Array.from(sentDaySet).filter((day) => receivedDaySet.has(day)).sort((a, b) => a - b);
   const spotlightEntry = currentMonthEntries.find((item) => item.body.trim().length >= 12) ?? currentMonthEntries[0] ?? null;
-  const closingEntry = currentMonthEntries[currentMonthEntries.length - 1] ?? null;
   const busiestDayLine = busiestDayEntry
     ? `${monthLabel}里最热闹的是 ${busiestDayEntry[0]} 号，那天你们一共留下了 ${busiestDayEntry[1]} 条内容。`
     : `${monthLabel}里还没有特别集中的记录日。`;
@@ -1986,14 +2003,6 @@ function buildMonthlyReview({
       : sharedDays.length > 0
         ? `这个月有 ${sharedDays.length} 天是你来我往的双向表达，不只是被看见，也有被回应。`
         : "这个月的内容还没有落在同一天彼此回应，但每一条都已经在关系里留下痕迹。";
-  const thankYouSpotlight = currentMonthEntries.find((item) => item.kind === "thank_you")?.body ?? null;
-  const noticedSpotlight = currentMonthEntries.find((item) => item.kind === "noticed")?.body ?? null;
-  const spotlightLines = [
-    thankYouSpotlight ? `这个月的一句谢谢：${thankYouSpotlight}` : null,
-    noticedSpotlight ? `这个月的一句看见：${noticedSpotlight}` : null,
-    closingEntry ? `这个月最早留下的一句：${closingEntry.body}` : null
-  ].filter((item): item is string => Boolean(item));
-
   return {
     monthLabel,
     isFutureMonth,
@@ -2007,7 +2016,6 @@ function buildMonthlyReview({
     rhythmLine,
     highlightDayLine: busiestDayLine,
     mutualLine,
-    spotlightLines,
     calendarDays
   };
 }
