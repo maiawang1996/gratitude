@@ -121,6 +121,7 @@ export function GratitudeApp() {
     receivedEntries,
     now: new Date()
   });
+  const overallStats = buildOverallStats(historyEntries);
 
   const triggerTodayFeedback = async (reaction: "seen" | "loved") => {
     if (!todayFeedbackEntry) return;
@@ -957,7 +958,7 @@ export function GratitudeApp() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-[2rem] font-semibold leading-none tracking-[0.01em]">回忆</h1>
-                  <p className="mt-1 text-[0.92rem] text-[#8f7568]">本周回顾与月度回顾</p>
+                  <p className="mt-1 text-[0.92rem] text-[#8f7568]">历史记录与月度回顾</p>
                 </div>
                 <div className="rounded-full bg-white/70 px-2 py-1 shadow-sm">
                   <AvatarStack />
@@ -975,7 +976,7 @@ export function GratitudeApp() {
                 onSelectEntry={setSelectedHistoryEntry}
                 onDeleteEntry={handleDeleteEntry}
               />
-              <MemoryCard title="本周回顾" subtitle="周一到周日" emptyText="目前还没有生成周回顾。" />
+              <OverallStatsCard stats={overallStats} />
               <MonthlyReviewCard review={monthlyReview} />
             </section>
           </>
@@ -1293,6 +1294,87 @@ function MemoryCard({
         <span className="rounded-full bg-[#fff4ea] px-3 py-1 text-xs text-[#c67c4e]">查看</span>
       </div>
       <p className="text-sm leading-7 text-[#8f7568]">{emptyText}</p>
+    </div>
+  );
+}
+
+function OverallStatsCard({
+  stats
+}: {
+  stats: Array<{
+    name: "Maia" | "Husband";
+    thankYouCount: number;
+    noticedCount: number;
+    totalCount: number;
+  }>;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-[#eadfce] bg-[linear-gradient(180deg,rgba(255,253,249,0.98),rgba(255,247,239,0.96))] shadow-[0_12px_28px_rgba(165,120,89,0.08)]">
+      <div className="border-b border-[#efe3d6] px-4 pb-2.5 pt-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[1rem] font-semibold text-ink">累计统计</p>
+            <p className="mt-1 text-xs text-[#8f7568]">两个人分别发出了多少条感谢与看见</p>
+          </div>
+          <div className="rounded-full bg-white/85 px-3 py-1 text-[0.72rem] font-semibold text-[#c67c4e] shadow-sm">
+            自动更新
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 py-3.5">
+        <div className="overflow-hidden rounded-[20px] border border-[#efdfce] bg-white/88">
+          <div className="grid grid-cols-[1.1fr_0.78fr_0.78fr_0.72fr] items-center bg-[linear-gradient(180deg,#fff5ec,#fff1e5)] px-3 py-2 text-[0.72rem] font-semibold tracking-[0.01em] text-[#937768]">
+            <span>来自</span>
+            <span className="text-center text-[#cb6f60]">❤</span>
+            <span className="text-center text-[#ab906a]">👀</span>
+            <span className="text-center">总数</span>
+          </div>
+
+          {stats.map((row, index) => (
+            <div
+              key={row.name}
+              className={`grid grid-cols-[1.1fr_0.78fr_0.78fr_0.72fr] items-center px-3 py-2.5 ${
+                index > 0 ? "border-t border-[#f4eadf]" : ""
+              }`}
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-full bg-[#fff3e8] text-[1.05rem] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+                  {row.name === "Maia" ? "👸" : "🧸"}
+                </div>
+                <p className="truncate text-[0.92rem] font-semibold text-ink">{row.name === "Maia" ? "宝贝" : "老公"}</p>
+              </div>
+
+              <div className="flex justify-center">
+                <div className="min-w-[2.8rem] rounded-[12px] border border-[#f1d6d0] bg-[linear-gradient(180deg,#fff4f1,#fffaf8)] px-1.5 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                  <p className="text-[0.98rem] font-semibold leading-none text-[#cb6f60]">{row.thankYouCount}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <div className="min-w-[2.8rem] rounded-[12px] border border-[#efe2ce] bg-[linear-gradient(180deg,#fff8ee,#fffdf9)] px-1.5 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+                  <p className="text-[0.98rem] font-semibold leading-none text-[#ab906a]">{row.noticedCount}</p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <p className="text-[0.96rem] font-semibold leading-none text-[#6d574b]">{row.totalCount}</p>
+                <p className="mt-0.5 text-[0.62rem] text-[#a18779]">条</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-2.5 grid grid-cols-3 gap-2 text-[0.68rem] text-[#8f7568]">
+          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">
+            <span className="text-[#cb6f60]">❤</span> 感谢
+          </div>
+          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">
+            <span className="text-[#ab906a]">👀</span> 看见
+          </div>
+          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">自动累计</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1810,6 +1892,38 @@ function buildMonthlyReview({
     spotlightLines,
     calendarDays
   };
+}
+
+function buildOverallStats(historyEntries: GratitudeEntry[]) {
+  const statsMap = new Map<"Maia" | "Husband", { thankYouCount: number; noticedCount: number }>([
+    ["Maia", { thankYouCount: 0, noticedCount: 0 }],
+    ["Husband", { thankYouCount: 0, noticedCount: 0 }]
+  ]);
+
+  historyEntries.forEach((item) => {
+    const current = statsMap.get(item.from);
+    if (!current) return;
+
+    if (item.kind === "thank_you") {
+      current.thankYouCount += 1;
+    } else {
+      current.noticedCount += 1;
+    }
+  });
+
+  return [
+    {
+      name: "Maia" as const,
+      ...statsMap.get("Maia")!,
+      totalCount: (statsMap.get("Maia")?.thankYouCount ?? 0) + (statsMap.get("Maia")?.noticedCount ?? 0)
+    },
+    {
+      name: "Husband" as const,
+      ...statsMap.get("Husband")!,
+      totalCount:
+        (statsMap.get("Husband")?.thankYouCount ?? 0) + (statsMap.get("Husband")?.noticedCount ?? 0)
+    }
+  ];
 }
 
 function getLongestStreak(days: number[]) {

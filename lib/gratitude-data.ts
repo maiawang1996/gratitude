@@ -1,5 +1,4 @@
 import {
-  CalendarDays,
   Heart,
   Library,
   Moon,
@@ -35,8 +34,6 @@ export const defaultDeliveryTime = "21:00";
 
 export const entries: GratitudeEntry[] = [];
 
-export const weeklyReview: Review | null = null;
-
 export const monthlyReflection: Review | null = null;
 
 export const featureRows = [
@@ -48,7 +45,7 @@ export const featureRows = [
 
 export const directorySections = [
   { label: "回忆库", value: "暂无", detail: "按年份和月份浏览", icon: Library },
-  { label: "周回顾", value: "暂无", detail: "Monday-Sunday", icon: CalendarDays },
+  { label: "累计统计", value: "自动更新", detail: "谢谢你 / 我看见了", icon: Heart },
   { label: "月总结", value: "暂无", detail: "有真实内容后生成", icon: NotebookTabs }
 ];
 
