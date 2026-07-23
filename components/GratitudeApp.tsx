@@ -993,6 +993,10 @@ export function GratitudeApp() {
                 </div>
               </section>
             ) : null}
+
+            <section className="mt-4">
+              <OverallStatsCard stats={overallStats} />
+            </section>
           </>
         ) : tab === "memory" ? (
           <>
@@ -1018,7 +1022,6 @@ export function GratitudeApp() {
                 onSelectEntry={setSelectedHistoryEntry}
                 onDeleteEntry={handleDeleteEntry}
               />
-              <OverallStatsCard stats={overallStats} />
               <MonthlyReviewCard
                 review={monthlyReview}
                 onPreviousMonth={() => setReviewMonthOffset((current) => current - 1)}
