@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   Heart,
   Library,
   LogIn,
@@ -69,7 +71,7 @@ type GratitudeEntryRow = {
 
 export function GratitudeApp() {
   const [tab, setTab] = useState<"home" | "memory" | "me">("home");
-  const [historyTab, setHistoryTab] = useState<"sent" | "received">("sent");
+  const [historyTab, setHistoryTab] = useState<"sent" | "received">("received");
   const [kind, setKind] = useState<EntryKind>("thank_you");
   const [sender, setSender] = useState<Sender | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | null>(null);
@@ -99,6 +101,7 @@ export function GratitudeApp() {
   const [dailyReminderVisible, setDailyReminderVisible] = useState(false);
   const [featureRowsExpanded, setFeatureRowsExpanded] = useState(false);
   const [birthdayPanelExpanded, setBirthdayPanelExpanded] = useState(false);
+  const [reviewMonthOffset, setReviewMonthOffset] = useState(0);
 
   const readableDeliveryTime = formatDeliveryTime(deliveryTime);
   const currentRole = resolveRole(currentUserEmail);
@@ -116,10 +119,13 @@ export function GratitudeApp() {
   const loveDuration = formatRelationshipDuration(LOVE_START_DATE);
   const marriageDuration = formatRelationshipDuration(MARRIAGE_START_DATE);
   const upcomingReminder = getUpcomingReminder(new Date());
+  const reviewMonthDate = new Date();
+  reviewMonthDate.setMonth(reviewMonthDate.getMonth() + reviewMonthOffset);
   const monthlyReview = buildMonthlyReview({
     sentEntries,
     receivedEntries,
-    now: new Date()
+    reviewMonth: reviewMonthDate,
+    currentDate: new Date()
   });
   const overallStats = buildOverallStats(historyEntries);
 
@@ -779,7 +785,7 @@ export function GratitudeApp() {
               <section className="mt-4 glass-panel rounded-[28px] p-3">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-[1.35rem] font-semibold text-ink">今天收到</h3>
+                    <h3 className="text-[1.35rem] font-semibold text-ink">最新收到</h3>
                   </div>
                   {todayFeedbackEntry ? (
                     <div className="flex items-center gap-2">
@@ -816,6 +822,7 @@ export function GratitudeApp() {
                 <div className="space-y-2">
                   {pendingReceivedEntries.map((item) => (
                     <div key={item.id} className="rounded-[24px] bg-[#fff6ee] p-3">
+                      <p className="text-[0.72rem] text-[#9a7f71]">{formatEntryTime(item.writtenAt)}</p>
                       <p className="mt-1 break-words whitespace-pre-wrap text-[1rem] leading-7 text-ink">
                         {item.body}
                       </p>
@@ -942,12 +949,12 @@ export function GratitudeApp() {
               <section className="mt-4 glass-panel rounded-[28px] p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h3 className="text-[1.35rem] font-semibold text-ink">今天收到</h3>
+                    <h3 className="text-[1.35rem] font-semibold text-ink">最新收到</h3>
                   </div>
                 </div>
 
                 <div className="rounded-[24px] bg-[#fff6ee] p-4">
-                  <p className="text-sm text-[#8f7568]">今天还没有收到内容。</p>
+                  <p className="text-sm text-[#8f7568]">还没有收到新的内容。</p>
                 </div>
               </section>
             ) : null}
@@ -977,7 +984,11 @@ export function GratitudeApp() {
                 onDeleteEntry={handleDeleteEntry}
               />
               <OverallStatsCard stats={overallStats} />
-              <MonthlyReviewCard review={monthlyReview} />
+              <MonthlyReviewCard
+                review={monthlyReview}
+                onPreviousMonth={() => setReviewMonthOffset((current) => current - 1)}
+                onNextMonth={() => setReviewMonthOffset((current) => current + 1)}
+              />
             </section>
           </>
         ) : (
@@ -1365,15 +1376,6 @@ function OverallStatsCard({
           ))}
         </div>
 
-        <div className="mt-2.5 grid grid-cols-3 gap-2 text-[0.68rem] text-[#8f7568]">
-          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">
-            <span className="text-[#cb6f60]">❤</span> 感谢
-          </div>
-          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">
-            <span className="text-[#ab906a]">👀</span> 看见
-          </div>
-          <div className="rounded-[14px] bg-white/60 px-2.5 py-2 text-center">自动累计</div>
-        </div>
       </div>
     </div>
   );
@@ -1439,10 +1441,13 @@ function BirthdayWidget({
 }
 
 function MonthlyReviewCard({
-  review
+  review,
+  onPreviousMonth,
+  onNextMonth
 }: {
   review: {
     monthLabel: string;
+    isFutureMonth: boolean;
     sentCount: number;
     receivedCount: number;
     thankYouCount: number;
@@ -1462,18 +1467,40 @@ function MonthlyReviewCard({
       isCurrentMonth: boolean;
     }>;
   };
+  onPreviousMonth: () => void;
+  onNextMonth: () => void;
 }) {
   return (
     <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-[0.98rem] font-semibold text-ink">月度回顾</p>
-          <p className="text-xs text-[#8f7568]">{review.monthLabel}</p>
+          <div className="mt-1 flex items-center gap-2 text-xs text-[#8f7568]">
+            <button
+              type="button"
+              onClick={onPreviousMonth}
+              className="grid h-6 w-6 place-items-center rounded-full bg-[#fff4ea] text-[#c67c4e]"
+              aria-label="上个月"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <p>{review.monthLabel}</p>
+            <button
+              type="button"
+              onClick={onNextMonth}
+              className="grid h-6 w-6 place-items-center rounded-full bg-[#fff4ea] text-[#c67c4e]"
+              aria-label="下个月"
+            >
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <span className="rounded-full bg-[#fff4ea] px-3 py-1 text-xs text-[#c67c4e]">自动生成</span>
       </div>
 
-      {review.sentCount === 0 && review.receivedCount === 0 ? (
+      {review.isFutureMonth ? (
+        <p className="text-sm leading-7 text-[#8f7568]">这个月还没开始。</p>
+      ) : review.sentCount === 0 && review.receivedCount === 0 ? (
         <p className="text-sm leading-7 text-[#8f7568]">这个月还没有内容，等你们慢慢写下来。</p>
       ) : (
         <div className="space-y-2.5 text-sm leading-6 text-[#6f5c52]">
@@ -1650,6 +1677,15 @@ function formatLocalEntryDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function formatEntryTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
 function formatRelationshipDuration(startDateText: string) {
   const startDate = new Date(`${startDateText}T00:00:00`);
   const now = new Date();
@@ -1764,14 +1800,19 @@ function getUpcomingReminder(now: Date) {
 function buildMonthlyReview({
   sentEntries,
   receivedEntries,
-  now
+  reviewMonth,
+  currentDate
 }: {
   sentEntries: GratitudeEntry[];
   receivedEntries: GratitudeEntry[];
-  now: Date;
+  reviewMonth: Date;
+  currentDate: Date;
 }) {
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  const monthStartDate = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth(), 1);
+  const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const isFutureMonth = monthStartDate.getTime() > currentMonthStart.getTime();
+  const monthStart = monthStartDate.getTime();
+  const monthEnd = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth() + 1, 1).getTime();
   const currentMonthEntries = [...sentEntries, ...receivedEntries]
     .filter((item) => {
       const time = new Date(item.writtenAt).getTime();
@@ -1779,7 +1820,7 @@ function buildMonthlyReview({
     })
     .sort((a, b) => new Date(b.writtenAt).getTime() - new Date(a.writtenAt).getTime());
 
-  const monthLabel = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月`;
+  const monthLabel = `${reviewMonth.getFullYear()} 年 ${reviewMonth.getMonth() + 1} 月`;
   const sentCount = currentMonthEntries.filter((item) => sentEntries.some((sent) => sent.id === item.id)).length;
   const receivedCount = currentMonthEntries.filter((item) => receivedEntries.some((received) => received.id === item.id)).length;
   const thankYouCount = currentMonthEntries.filter((item) => item.kind === "thank_you").length;
@@ -1810,8 +1851,8 @@ function buildMonthlyReview({
     receivedDaySet.add(new Date(item.writtenAt).getDate());
   });
 
-  const firstWeekday = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstWeekday = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth(), 1).getDay();
+  const daysInMonth = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth() + 1, 0).getDate();
   const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
     if (index < firstWeekday) {
       return {
@@ -1879,6 +1920,7 @@ function buildMonthlyReview({
 
   return {
     monthLabel,
+    isFutureMonth,
     sentCount,
     receivedCount,
     thankYouCount,
