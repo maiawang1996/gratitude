@@ -72,6 +72,8 @@ type GratitudeEntryRow = {
 export function GratitudeApp() {
   const [tab, setTab] = useState<"home" | "memory" | "me">("home");
   const [historyTab, setHistoryTab] = useState<"sent" | "received">("received");
+  const [mood, setMood] = useState<"celebrating" | "soft" | "blank" | "tired" | null>(null);
+  const [moodOverlay, setMoodOverlay] = useState<"celebrating" | "soft" | "blank" | "tired" | null>(null);
   const [kind, setKind] = useState<EntryKind>("thank_you");
   const [sender, setSender] = useState<Sender | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | null>(null);
@@ -128,6 +130,12 @@ export function GratitudeApp() {
     currentDate: new Date()
   });
   const overallStats = buildOverallStats(historyEntries);
+  const moodItems = [
+    { key: "celebrating" as const, emoji: "🥳", caption: "哇！今天是心情超好的一天", overlayTitle: "今天亮晶晶的", overlayBody: "把开心轻轻放在这里了" },
+    { key: "soft" as const, emoji: "😊", caption: "嘿嘿，今天心情不错哦～", overlayTitle: "今天很温柔", overlayBody: "这一刻被安安静静地记住了" },
+    { key: "blank" as const, emoji: "🫥", caption: "嗯…今天有一点放空…", overlayTitle: "今天想慢一点", overlayBody: "就这样发会儿呆也没关系" },
+    { key: "tired" as const, emoji: "😣", caption: "今天有点累了，要多休息照顾自己呀", overlayTitle: "今天辛苦了", overlayBody: "先抱一抱自己，再慢慢往前走" }
+  ];
 
   const triggerTodayFeedback = async (reaction: "seen" | "loved") => {
     if (!todayFeedbackEntry) return;
@@ -765,6 +773,32 @@ export function GratitudeApp() {
                 </div>
               ) : null}
 
+              <div className="mt-3 rounded-[22px] border border-[#eadfce] bg-white/58 px-3 py-3 shadow-[0_8px_18px_rgba(184,113,93,0.06)] backdrop-blur-xl">
+                <p className="text-[0.84rem] font-medium text-[#8f7568]">今天心情怎么样？</p>
+                <div className="mt-2 grid grid-cols-4 gap-1.5">
+                  {moodItems.map((item) => (
+                    <div key={item.key} className="flex flex-col items-center text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMood(item.key);
+                          setMoodOverlay(item.key);
+                          window.setTimeout(() => setMoodOverlay(null), 1100);
+                        }}
+                        className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
+                          mood === item.key
+                            ? "border-[#efb08c] bg-[#fff2e8] shadow-[0_6px_14px_rgba(184,113,93,0.12)]"
+                            : "border-[#efe2d6] bg-white/75"
+                        }`}
+                      >
+                        {item.emoji}
+                      </button>
+                      <p className="mt-1.5 text-[0.62rem] leading-[1.25] text-[#9a7f71]">{item.caption}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <CountWidget
                   title="恋爱时长 2017.09.12"
@@ -1134,6 +1168,48 @@ export function GratitudeApp() {
               </div>
               <p className="mt-5 text-[1.6rem] font-semibold text-ink">你已经喜欢了</p>
               <p className="mt-2 text-sm text-[#8f7568]">这份心意正在发亮</p>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {moodOverlay ? (
+        <div className="fixed inset-0 z-[67] flex items-center justify-center bg-[#fffdf9]/98 px-4 backdrop-blur-[2px]">
+          {moodOverlay === "celebrating" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-28 w-28 rounded-full bg-[#fff0dc] opacity-80 animate-[ping_1.2s_ease-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[bounce_0.9s_ease-in-out_infinite]">🥳</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天亮晶晶的</p>
+              <p className="mt-2 text-sm text-[#8f7568]">把开心轻轻放在这里了</p>
+            </div>
+          ) : moodOverlay === "soft" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-24 w-24 rounded-full bg-[#fff4e8] opacity-85 animate-[pulse_1s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[pulse_1s_ease-in-out_infinite]">😊</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天很温柔</p>
+              <p className="mt-2 text-sm text-[#8f7568]">这一刻被安安静静地记住了</p>
+            </div>
+          ) : moodOverlay === "blank" ? (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-24 w-24 rounded-full bg-[#f7f2ec] opacity-90 animate-[pulse_1.2s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[pulse_1.2s_ease-in-out_infinite]">🫥</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天想慢一点</p>
+              <p className="mt-2 text-sm text-[#8f7568]">就这样发会儿呆也没关系</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div className="absolute h-24 w-24 rounded-full bg-[#fff0ea] opacity-80 animate-[pulse_0.95s_ease-in-out_infinite]" />
+                <span className="relative text-[4rem] leading-none animate-[translateY(0)]">😣</span>
+              </div>
+              <p className="mt-5 text-[1.6rem] font-semibold text-ink">今天辛苦了</p>
+              <p className="mt-2 text-sm text-[#8f7568]">先抱一抱自己，再慢慢往前走</p>
             </div>
           )}
         </div>
