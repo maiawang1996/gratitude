@@ -69,16 +69,36 @@ type GratitudeEntryRow = {
   created_at: string;
 };
 
+type MoodKey = "celebrating" | "soft" | "lovey" | "sleepy" | "blank" | "quiet" | "tired";
+
+type DailyMoodRow = {
+  id: string;
+  couple_id: string;
+  user_id: string;
+  mood: MoodKey;
+  local_entry_date: string;
+  created_at: string | null;
+};
+
+type DailyMoodRecord = {
+  id: string;
+  userId: string;
+  from: "Maia" | "Husband";
+  mood: MoodKey;
+  localEntryDate: string;
+};
+
 export function GratitudeApp() {
   const [tab, setTab] = useState<"home" | "memory" | "me">("home");
   const [historyTab, setHistoryTab] = useState<"sent" | "received">("received");
-  const [mood, setMood] = useState<"celebrating" | "soft" | "lovey" | "sleepy" | "blank" | "quiet" | "tired" | null>(null);
-  const [moodOverlay, setMoodOverlay] = useState<"celebrating" | "soft" | "lovey" | "sleepy" | "blank" | "quiet" | "tired" | null>(null);
+  const [mood, setMood] = useState<MoodKey | null>(null);
+  const [moodOverlay, setMoodOverlay] = useState<MoodKey | null>(null);
   const [kind, setKind] = useState<EntryKind>("thank_you");
   const [sender, setSender] = useState<Sender | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode | null>(null);
   const [note, setNote] = useState("");
   const [historyEntries, setHistoryEntries] = useState<GratitudeEntry[]>(entries);
+  const [dailyMoods, setDailyMoods] = useState<DailyMoodRecord[]>([]);
   const [deliveryTime, setDeliveryTime] = useState(defaultDeliveryTime);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -126,6 +146,7 @@ export function GratitudeApp() {
   const monthlyReview = buildMonthlyReview({
     sentEntries,
     receivedEntries,
+    dailyMoods,
     reviewMonth: reviewMonthDate,
     currentDate: new Date()
   });
@@ -147,6 +168,47 @@ export function GratitudeApp() {
     await handleReactEntry(todayFeedbackEntry.id, reaction);
     window.setTimeout(() => setTodayFeedbackPulse(null), 420);
     window.setTimeout(() => setTodayFeedbackOverlay(null), 1100);
+  };
+
+  const handleSelectMood = async (nextMood: MoodKey) => {
+    const today = formatLocalEntryDate(new Date());
+    const authorName = currentRole === ROLE_BABY ? "Maia" : "Husband";
+    const fallbackId = currentRole === ROLE_BABY ? babyUserId : husbandUserId;
+    setMood(nextMood);
+    setMoodOverlay(nextMood);
+    setDailyMoods((current) => {
+      const existingIndex = current.findIndex((item) => item.userId === (currentUserId || fallbackId) && item.localEntryDate === today);
+      const nextRecord: DailyMoodRecord = {
+        id: `${currentUserId || fallbackId}-${today}`,
+        userId: currentUserId || fallbackId,
+        from: authorName,
+        mood: nextMood,
+        localEntryDate: today
+      };
+
+      if (existingIndex === -1) return [...current, nextRecord];
+      return current.map((item, index) => (index === existingIndex ? nextRecord : item));
+    });
+    window.setTimeout(() => setMoodOverlay(null), 1100);
+
+    if (!currentUserId || !(coupleIdFallback || coupleId)) return;
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.from("daily_moods").upsert(
+        {
+          couple_id: coupleIdFallback || coupleId,
+          user_id: currentUserId,
+          mood: nextMood,
+          local_entry_date: today
+        },
+        {
+          onConflict: "couple_id,user_id,local_entry_date"
+        }
+      );
+    } catch {
+      // Keep local state even if mood persistence is not available yet.
+    }
   };
 
   const handleSave = async () => {
@@ -427,6 +489,17 @@ export function GratitudeApp() {
           )
         ) ?? [];
         setHistoryEntries(mapped);
+
+        const { data: moodRows } = await supabase
+          .from("daily_moods")
+          .select("*")
+          .eq("couple_id", coupleIdFallback || coupleId)
+          .order("local_entry_date", { ascending: false });
+
+        const mappedMoods = ((moodRows as DailyMoodRow[] | null | undefined) ?? [])
+          .map((row) => mapMoodRowToUi(row))
+          .filter((item): item is DailyMoodRecord => Boolean(item));
+        setDailyMoods(mappedMoods);
       } finally {
         setDataLoading(false);
       }
@@ -796,15 +869,13 @@ export function GratitudeApp() {
                     <button
                       key={item.key}
                       type="button"
-                      onClick={() => {
-                        setMood(item.key);
-                        setMoodOverlay(item.key);
-                        window.setTimeout(() => setMoodOverlay(null), 1100);
-                      }}
+                      onClick={() => void handleSelectMood(item.key)}
                       className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
                         mood === item.key
-                          ? "border-[#efb08c] bg-[#fff2e8] shadow-[0_6px_14px_rgba(184,113,93,0.12)]"
-                          : "border-[#efe2d6] bg-white/75"
+                          ? "scale-105 border-[#efb08c] bg-[#fff2e8] opacity-100 shadow-[0_10px_18px_rgba(184,113,93,0.18)]"
+                          : mood
+                            ? "border-[#f2e8dd] bg-white/45 opacity-40 saturate-50"
+                            : "border-[#efe2d6] bg-white/75 opacity-100"
                       }`}
                     >
                       {item.emoji}
@@ -1570,12 +1641,16 @@ function MonthlyReviewCard({
       dayNumber: number | null;
       hasBaby: boolean;
       hasHusband: boolean;
+      babyMoodLevel: number | null;
+      husbandMoodLevel: number | null;
       isCurrentMonth: boolean;
     }>;
   };
   onPreviousMonth: () => void;
   onNextMonth: () => void;
 }) {
+  const [calendarMode, setCalendarMode] = useState<"sent" | "mood">("sent");
+
   return (
     <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -1617,14 +1692,41 @@ function MonthlyReviewCard({
 
           <div className="rounded-[20px] bg-[#fff8f1] p-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[0.86rem] font-medium text-[#8f7568]">发送日历</p>
+              <div className="grid grid-cols-2 gap-1 rounded-[16px] bg-[#f6efe7] p-1">
+                <button
+                  type="button"
+                  onClick={() => setCalendarMode("sent")}
+                  className={`rounded-[12px] px-2.5 py-1.5 text-[0.75rem] font-semibold transition ${
+                    calendarMode === "sent" ? "bg-white text-ink shadow-sm" : "text-[#8f7568]"
+                  }`}
+                >
+                  发送日历
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarMode("mood")}
+                  className={`rounded-[12px] px-2.5 py-1.5 text-[0.75rem] font-semibold transition ${
+                    calendarMode === "mood" ? "bg-white text-ink shadow-sm" : "text-[#8f7568]"
+                  }`}
+                >
+                  心情日历
+                </button>
+              </div>
               <div className="flex items-center gap-3 text-[0.72rem] text-[#8f7568]">
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#f4a06f]" />
+                  {calendarMode === "sent" ? (
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#f4a06f]" />
+                  ) : (
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#d96b6b]" />
+                  )}
                   宝贝
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#c9ab7b]" />
+                  {calendarMode === "sent" ? (
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#c9ab7b]" />
+                  ) : (
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#7da7df]" />
+                  )}
                   老公
                 </span>
               </div>
@@ -1643,10 +1745,27 @@ function MonthlyReviewCard({
                   }`}
                 >
                   <span className={day.isCurrentMonth ? "text-[#6f5c52]" : "text-transparent"}>{day.dayNumber ?? ""}</span>
-                  <span className="mt-0.5 flex items-center gap-1">
-                    {day.hasBaby ? <span className="h-1.5 w-1.5 rounded-full bg-[#f4a06f]" /> : null}
-                    {day.hasHusband ? <span className="h-1.5 w-1.5 rounded-full bg-[#c9ab7b]" /> : null}
-                  </span>
+                  {calendarMode === "sent" ? (
+                    <span className="mt-0.5 flex items-center gap-1">
+                      {day.hasBaby ? <span className="h-1.5 w-1.5 rounded-full bg-[#f4a06f]" /> : null}
+                      {day.hasHusband ? <span className="h-1.5 w-1.5 rounded-full bg-[#c9ab7b]" /> : null}
+                    </span>
+                  ) : (
+                    <span className="mt-0.5 flex items-center gap-1">
+                      {day.babyMoodLevel ? (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: getMoodDotColor("baby", day.babyMoodLevel) }}
+                        />
+                      ) : null}
+                      {day.husbandMoodLevel ? (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: getMoodDotColor("husband", day.husbandMoodLevel) }}
+                        />
+                      ) : null}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -1807,6 +1926,49 @@ function formatRelationshipDuration(startDateText: string) {
   };
 }
 
+function getMoodLevel(mood: MoodKey) {
+  switch (mood) {
+    case "celebrating":
+      return 7;
+    case "lovey":
+      return 6;
+    case "soft":
+      return 5;
+    case "blank":
+      return 3;
+    case "quiet":
+      return 2;
+    case "sleepy":
+      return 4;
+    case "tired":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function getMoodDotColor(person: "baby" | "husband", level: number) {
+  const opacity = 0.22 + level * 0.1;
+  return person === "baby"
+    ? `rgba(217, 107, 107, ${Math.min(opacity, 0.92)})`
+    : `rgba(125, 167, 223, ${Math.min(opacity, 0.92)})`;
+}
+
+function mapMoodRowToUi(row: DailyMoodRow): DailyMoodRecord | null {
+  const from =
+    row.user_id === babyUserId ? "Maia" : row.user_id === husbandUserId ? "Husband" : null;
+
+  if (!from) return null;
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    from,
+    mood: row.mood,
+    localEntryDate: row.local_entry_date
+  };
+}
+
 function buildScheduledDeliverAt(baseDate: Date, timeValue: string) {
   const [hoursText, minutesText] = timeValue.split(":");
   const hours = Number(hoursText);
@@ -1897,11 +2059,13 @@ function getUpcomingReminder(now: Date) {
 function buildMonthlyReview({
   sentEntries,
   receivedEntries,
+  dailyMoods,
   reviewMonth,
   currentDate
 }: {
   sentEntries: GratitudeEntry[];
   receivedEntries: GratitudeEntry[];
+  dailyMoods: DailyMoodRecord[];
   reviewMonth: Date;
   currentDate: Date;
 }) {
@@ -1925,6 +2089,7 @@ function buildMonthlyReview({
   const recentLine = currentMonthEntries[0]?.body ?? null;
   const uniqueDays = Array.from(new Set(currentMonthEntries.map((item) => new Date(item.writtenAt).getDate()))).sort((a, b) => a - b);
   const dayMap = new Map<number, { hasBaby: boolean; hasHusband: boolean }>();
+  const moodDayMap = new Map<number, { babyMoodLevel: number | null; husbandMoodLevel: number | null }>();
   const dayEntryCount = new Map<number, number>();
   const sentDaySet = new Set<number>();
   const receivedDaySet = new Set<number>();
@@ -1948,6 +2113,20 @@ function buildMonthlyReview({
     receivedDaySet.add(new Date(item.writtenAt).getDate());
   });
 
+  dailyMoods
+    .filter((item) => {
+      const [year, month] = item.localEntryDate.split("-").map(Number);
+      return year === reviewMonth.getFullYear() && month === reviewMonth.getMonth() + 1;
+    })
+    .forEach((item) => {
+      const dayNumber = Number(item.localEntryDate.slice(8, 10));
+      const current = moodDayMap.get(dayNumber) ?? { babyMoodLevel: null, husbandMoodLevel: null };
+      const level = getMoodLevel(item.mood);
+      if (item.from === "Maia") current.babyMoodLevel = level;
+      if (item.from === "Husband") current.husbandMoodLevel = level;
+      moodDayMap.set(dayNumber, current);
+    });
+
   const firstWeekday = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth(), 1).getDay();
   const daysInMonth = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth() + 1, 0).getDate();
   const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) => {
@@ -1957,17 +2136,22 @@ function buildMonthlyReview({
         dayNumber: null,
         hasBaby: false,
         hasHusband: false,
+        babyMoodLevel: null,
+        husbandMoodLevel: null,
         isCurrentMonth: false
       };
     }
 
     const dayNumber = index - firstWeekday + 1;
     const flags = dayMap.get(dayNumber) ?? { hasBaby: false, hasHusband: false };
+    const moodFlags = moodDayMap.get(dayNumber) ?? { babyMoodLevel: null, husbandMoodLevel: null };
     return {
       key: `day-${dayNumber}`,
       dayNumber,
       hasBaby: flags.hasBaby,
       hasHusband: flags.hasHusband,
+      babyMoodLevel: moodFlags.babyMoodLevel,
+      husbandMoodLevel: moodFlags.husbandMoodLevel,
       isCurrentMonth: true
     };
   });
