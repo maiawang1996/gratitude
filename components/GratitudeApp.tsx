@@ -256,7 +256,7 @@ export function GratitudeApp() {
       const currentUserIdFixed = currentRoleLabel === "Maia" ? babyUserId : husbandUserId;
       const partnerUserId = currentRoleLabel === "Maia" ? husbandUserId : babyUserId;
 
-      let activeCurrentUserId = currentUserIdFixed || sessionUserId;
+      let activeCurrentUserId = sessionUserId || currentUserIdFixed;
       let activeCoupleId = coupleIdFallback || coupleId;
 
       if (!activeCoupleId) {
@@ -505,11 +505,16 @@ export function GratitudeApp() {
         ) ?? [];
         setHistoryEntries(mapped);
 
-        const { data: moodRows } = await supabase
+        const { data: moodRows, error: moodError } = await supabase
           .from("daily_moods")
           .select("*")
           .eq("couple_id", coupleIdFallback || coupleId)
           .order("local_entry_date", { ascending: false });
+
+        if (moodError) {
+          setAuthError(moodError.message);
+          return;
+        }
 
         const mappedMoods = ((moodRows as DailyMoodRow[] | null | undefined) ?? [])
           .map((row) => mapMoodRowToUi(row))

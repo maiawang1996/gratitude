@@ -67,6 +67,17 @@ create table public.push_subscriptions (
   updated_at timestamptz not null default now()
 );
 
+create table public.daily_moods (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  mood text not null check (mood in ('celebrating', 'soft', 'lovey', 'sleepy', 'blank', 'quiet', 'tired')),
+  local_entry_date date not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (couple_id, user_id, local_entry_date)
+);
+
 create or replace function public.get_push_subscriptions_for_user(target_user_id uuid)
 returns setof public.push_subscriptions
 language sql
@@ -84,6 +95,7 @@ alter table public.couple_members enable row level security;
 alter table public.gratitude_entries enable row level security;
 alter table public.generated_reviews enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.daily_moods enable row level security;
 
 create or replace function public.prevent_gratitude_entry_content_changes()
 returns trigger
@@ -200,6 +212,36 @@ using (
       and couple_members.user_id = auth.uid()
   )
 );
+
+create policy "members can read daily moods"
+on public.daily_moods for select
+using (
+  exists (
+    select 1 from public.couple_members
+    where couple_members.couple_id = daily_moods.couple_id
+      and couple_members.user_id = auth.uid()
+  )
+);
+
+create policy "users can write their own daily moods"
+on public.daily_moods for insert
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1 from public.couple_members
+    where couple_members.couple_id = daily_moods.couple_id
+      and couple_members.user_id = auth.uid()
+  )
+);
+
+create policy "users can update their own daily moods"
+on public.daily_moods for update
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create policy "users can delete their own daily moods"
+on public.daily_moods for delete
+using (user_id = auth.uid());
 
 create policy "users can manage their own push subscriptions"
 on public.push_subscriptions for all
