@@ -453,6 +453,21 @@ export function GratitudeApp() {
   }, [currentUserEmail, historyEntries]);
 
   useEffect(() => {
+    if (!currentRole) {
+      setMood(null);
+      return;
+    }
+
+    const today = formatLocalEntryDate(new Date());
+    const activeUserId = currentUserId || (currentRole === ROLE_BABY ? babyUserId : husbandUserId);
+    const todayMood = dailyMoods.find(
+      (item) => item.userId === activeUserId && item.localEntryDate === today
+    );
+
+    setMood(todayMood?.mood ?? null);
+  }, [currentRole, currentUserId, dailyMoods]);
+
+  useEffect(() => {
     if (!currentUserId) return;
 
     const loadData = async () => {
@@ -1890,7 +1905,10 @@ function resolveRole(email: string) {
 }
 
 function formatLocalEntryDate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatEntryTime(value: string) {
