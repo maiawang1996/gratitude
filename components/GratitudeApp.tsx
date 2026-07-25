@@ -987,6 +987,8 @@ export function GratitudeApp() {
                     <button
                       key={item.key}
                       type="button"
+                      aria-pressed={mood === item.key}
+                      data-selected={mood === item.key ? "true" : "false"}
                       onClick={() => void handleSelectMood(item.key)}
                       className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
                         mood === item.key
@@ -1000,6 +1002,11 @@ export function GratitudeApp() {
                     </button>
                   ))}
                 </div>
+                {mood ? (
+                  <p className="mt-2 text-[0.74rem] font-medium text-[#a07d6c]">
+                    已记录今天的心情
+                  </p>
+                ) : null}
               </div>
 
               {upcomingReminder ? <BirthdayWidget reminder={upcomingReminder} /> : null}
