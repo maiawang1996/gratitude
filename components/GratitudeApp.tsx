@@ -1915,13 +1915,13 @@ function MoodCalendarCard({
   onNextMonth: () => void;
 }) {
   const babyLegend = [
-    { label: "低落", level: 1 },
-    { label: "安静", level: 2 },
-    { label: "放空", level: 3 },
-    { label: "困困", level: 4 },
-    { label: "不错", level: 5 },
-    { label: "甜甜", level: 6 },
-    { label: "超好", level: 7 }
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4 },
+    { level: 5 },
+    { level: 6 },
+    { level: 7 }
   ];
   const husbandLegend = babyLegend;
 
@@ -2008,20 +2008,18 @@ function MoodLegendRow({
 }: {
   title: string;
   person: "baby" | "husband";
-  items: Array<{ label: string; level: number }>;
+  items: Array<{ level: number }>;
 }) {
   return (
     <div className="rounded-[18px] bg-[#fff8f1] px-3 py-2.5">
       <p className="mb-2 text-[0.82rem] font-semibold text-ink">{title}</p>
-      <div className="flex flex-wrap gap-x-3 gap-y-2">
+      <div className="flex flex-wrap gap-2">
         {items.map((item) => (
-          <span key={`${person}-${item.level}`} className="inline-flex items-center gap-1.5 text-[0.74rem] text-[#8f7568]">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: getMoodDotColor(person, item.level) }}
-            />
-            {item.label}
-          </span>
+          <span
+            key={`${person}-${item.level}`}
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: getMoodDotColor(person, item.level) }}
+          />
         ))}
       </div>
     </div>
