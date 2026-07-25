@@ -1915,13 +1915,13 @@ function MoodCalendarCard({
   onNextMonth: () => void;
 }) {
   const babyLegend = [
-    { label: "😣", level: 1 },
-    { label: "😶", level: 2 },
-    { label: "🫥", level: 3 },
-    { label: "😴", level: 4 },
-    { label: "😉", level: 5 },
-    { label: "🥰", level: 6 },
-    { label: "🥳", level: 7 }
+    { label: "低落", level: 1 },
+    { label: "安静", level: 2 },
+    { label: "放空", level: 3 },
+    { label: "困困", level: 4 },
+    { label: "不错", level: 5 },
+    { label: "甜甜", level: 6 },
+    { label: "超好", level: 7 }
   ];
   const husbandLegend = babyLegend;
 
@@ -1957,6 +1957,11 @@ function MoodCalendarCard({
         <p className="text-sm leading-7 text-[#8f7568]">这个月还没开始。</p>
       ) : (
         <>
+          <div className="mb-3 grid gap-2.5">
+            <MoodLegendRow title="宝贝" person="baby" items={babyLegend} />
+            <MoodLegendRow title="老公" person="husband" items={husbandLegend} />
+          </div>
+
           <div className="rounded-[20px] bg-[#fff8f1] p-3">
             <div className="grid grid-cols-7 gap-y-2 text-center text-[0.68rem] text-[#b09583]">
               {["日", "一", "二", "三", "四", "五", "六"].map((label) => (
@@ -1989,11 +1994,6 @@ function MoodCalendarCard({
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="mt-3 grid gap-2.5">
-            <MoodLegendRow title="宝贝" person="baby" items={babyLegend} />
-            <MoodLegendRow title="老公" person="husband" items={husbandLegend} />
           </div>
         </>
       )}
