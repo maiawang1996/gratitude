@@ -51,6 +51,7 @@ type CoupleMemberRow = {
   couple_id: string;
   user_id: string;
   display_name: string;
+  created_at?: string;
 };
 
 type GratitudeEntryRow = {
@@ -86,6 +87,12 @@ type DailyMoodRecord = {
   from: "Maia" | "Husband";
   mood: MoodKey;
   localEntryDate: string;
+};
+
+type MemberDirectory = {
+  current: CoupleMemberRow | null;
+  partner: CoupleMemberRow | null;
+  coupleId: string;
 };
 
 export function GratitudeApp() {
@@ -172,15 +179,18 @@ export function GratitudeApp() {
 
   const handleSelectMood = async (nextMood: MoodKey) => {
     const today = formatLocalEntryDate(new Date());
-    const authorName = currentRole === ROLE_BABY ? "Maia" : "Husband";
-    const fallbackId = currentRole === ROLE_BABY ? babyUserId : husbandUserId;
+    const authorName: "Maia" | "Husband" =
+      (normalizeMemberName(currentMemberName) ?? getFallbackMemberName(currentRole) ?? "Maia") === "Husband"
+        ? "Husband"
+        : "Maia";
+    const fallbackId = currentUserId || (currentRole === ROLE_BABY ? babyUserId : husbandUserId);
     setMood(nextMood);
     setMoodOverlay(nextMood);
     setDailyMoods((current) => {
-      const existingIndex = current.findIndex((item) => item.userId === (currentUserId || fallbackId) && item.localEntryDate === today);
+      const existingIndex = current.findIndex((item) => item.userId === fallbackId && item.localEntryDate === today);
       const nextRecord: DailyMoodRecord = {
-        id: `${currentUserId || fallbackId}-${today}`,
-        userId: currentUserId || fallbackId,
+        id: `${fallbackId}-${today}`,
+        userId: fallbackId,
         from: authorName,
         mood: nextMood,
         localEntryDate: today
@@ -191,13 +201,13 @@ export function GratitudeApp() {
     });
     window.setTimeout(() => setMoodOverlay(null), 1100);
 
-    if (!currentUserId || !(coupleIdFallback || coupleId)) return;
+    if (!currentUserId || !coupleId) return;
 
     try {
       const supabase = getSupabaseBrowserClient();
       await supabase.from("daily_moods").upsert(
         {
-          couple_id: coupleIdFallback || coupleId,
+          couple_id: coupleId,
           user_id: currentUserId,
           mood: nextMood,
           local_entry_date: today
@@ -250,17 +260,19 @@ export function GratitudeApp() {
       const { data: sessionData } = await supabase.auth.getSession();
       const sessionUser = sessionData.session?.user ?? null;
       const sessionUserId = sessionUser?.id ?? currentUserId;
-      const sessionEmail = sessionUser?.email?.toLowerCase() ?? currentUserEmail;
-      const currentRoleLabel = resolveRole(sessionEmail) === ROLE_BABY ? "Maia" : "Husband";
-      const partnerRoleLabel = currentRoleLabel === "Maia" ? "Husband" : "Maia";
-      const currentUserIdFixed = currentRoleLabel === "Maia" ? babyUserId : husbandUserId;
-      const partnerUserId = currentRoleLabel === "Maia" ? husbandUserId : babyUserId;
+      const activeCurrentUserId = sessionUserId || currentUserId;
+      const activeCoupleId = coupleId;
+      const activeCurrentMemberName = normalizeMemberName(currentMemberName) ?? getFallbackMemberName(resolveRole(currentUserEmail)) ?? "Maia";
+      const activePartnerMemberName = normalizeMemberName(partnerMemberName) ?? (activeCurrentMemberName === "Maia" ? "Husband" : "Maia");
+      const activePartnerUserId = partnerUserId;
 
-      let activeCurrentUserId = sessionUserId || currentUserIdFixed;
-      let activeCoupleId = coupleIdFallback || coupleId;
-
-      if (!activeCoupleId) {
+      if (!activeCoupleId || !activeCurrentUserId) {
         setSaveStatus("没找到情侣关系");
+        return;
+      }
+
+      if (!activePartnerUserId) {
+        setSaveStatus("没找到对方成员");
         return;
       }
 
@@ -276,7 +288,7 @@ export function GratitudeApp() {
       const payload = {
         couple_id: activeCoupleId,
         author_id: activeCurrentUserId,
-        recipient_id: partnerUserId,
+        recipient_id: activePartnerUserId,
         kind,
         body: note.trim(),
         local_entry_date: formatLocalEntryDate(createdAt),
@@ -299,8 +311,8 @@ export function GratitudeApp() {
       const savedEntry = mapEntryRowToUi(
         data as GratitudeEntryRow,
         activeCurrentUserId,
-        currentRoleLabel,
-        partnerRoleLabel
+        activeCurrentMemberName,
+        activePartnerMemberName
       );
       setHistoryEntries((current) => [savedEntry, ...current]);
       if (deliveryMode === "now") {
@@ -308,7 +320,7 @@ export function GratitudeApp() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            recipientId: partnerUserId,
+            recipientId: activePartnerUserId,
             title: kind === "thank_you" ? "收到一条谢谢你" : "收到一条我看见了",
             message: note.trim(),
             url: "/"
@@ -475,19 +487,61 @@ export function GratitudeApp() {
       setAuthError(null);
       try {
         const supabase = getSupabaseBrowserClient();
-        const currentRoleLabelFallback = resolveRole(currentUserEmail) === ROLE_BABY ? "Maia" : resolveRole(currentUserEmail) === ROLE_HUSBAND ? "Husband" : "";
-        const currentMemberNameFallback = currentRoleLabelFallback || "Maia";
-        const partnerMemberNameFallback = currentMemberNameFallback === "Maia" ? "Husband" : "Maia";
+        const { data: membershipRows, error: membershipError } = await supabase
+          .from("couple_members")
+          .select("*")
+          .eq("user_id", currentUserId);
 
-        setCoupleId(coupleIdFallback);
-        setCurrentMemberName(currentMemberNameFallback);
-        setPartnerMemberName(partnerMemberNameFallback);
-        setPartnerUserId(currentMemberNameFallback === "Maia" ? husbandUserId : babyUserId);
+        if (membershipError) {
+          setAuthError(membershipError.message);
+          return;
+        }
+
+        const currentMembership = ((membershipRows as CoupleMemberRow[] | null | undefined) ?? [])[0] ?? null;
+        const activeCoupleId = currentMembership?.couple_id ?? coupleIdFallback ?? coupleId;
+
+        if (!activeCoupleId) {
+          setAuthError("没找到情侣关系。");
+          return;
+        }
+
+        const { data: memberRows, error: memberRowsError } = await supabase
+          .from("couple_members")
+          .select("*")
+          .eq("couple_id", activeCoupleId);
+
+        if (memberRowsError) {
+          setAuthError(memberRowsError.message);
+          return;
+        }
+
+        const memberDirectory = resolveMemberDirectory(
+          (memberRows as CoupleMemberRow[] | null | undefined) ?? [],
+          currentUserId,
+          resolveRole(currentUserEmail),
+          activeCoupleId
+        );
+        const currentMemberNameResolved: "Maia" | "Husband" =
+          (normalizeMemberName(memberDirectory.current?.display_name ?? "") ??
+            getFallbackMemberName(resolveRole(currentUserEmail)) ??
+            "Maia") === "Husband"
+            ? "Husband"
+            : "Maia";
+        const partnerMemberNameResolved: "Maia" | "Husband" =
+          (normalizeMemberName(memberDirectory.partner?.display_name ?? "") ??
+            (currentMemberNameResolved === "Maia" ? "Husband" : "Maia")) === "Husband"
+            ? "Husband"
+            : "Maia";
+
+        setCoupleId(memberDirectory.coupleId);
+        setCurrentMemberName(currentMemberNameResolved);
+        setPartnerMemberName(partnerMemberNameResolved);
+        setPartnerUserId(memberDirectory.partner?.user_id ?? "");
 
         const { data: entryRows, error: entryError } = await supabase
           .from("gratitude_entries")
           .select("*")
-          .eq("couple_id", coupleIdFallback || coupleId)
+          .eq("couple_id", memberDirectory.coupleId)
           .order("created_at", { ascending: false });
 
         if (entryError) {
@@ -499,8 +553,8 @@ export function GratitudeApp() {
           mapEntryRowToUi(
             row,
             currentUserId,
-            currentMemberNameFallback,
-            partnerMemberNameFallback
+            currentMemberNameResolved,
+            partnerMemberNameResolved
           )
         ) ?? [];
         setHistoryEntries(mapped);
@@ -508,7 +562,7 @@ export function GratitudeApp() {
         const { data: moodRows, error: moodError } = await supabase
           .from("daily_moods")
           .select("*")
-          .eq("couple_id", coupleIdFallback || coupleId)
+          .eq("couple_id", memberDirectory.coupleId)
           .order("local_entry_date", { ascending: false });
 
         if (moodError) {
@@ -517,7 +571,7 @@ export function GratitudeApp() {
         }
 
         const mappedMoods = ((moodRows as DailyMoodRow[] | null | undefined) ?? [])
-          .map((row) => mapMoodRowToUi(row))
+          .map((row) => mapMoodRowToUi(row, currentMemberNameResolved, partnerMemberNameResolved, currentUserId, memberDirectory.partner?.user_id ?? ""))
           .filter((item): item is DailyMoodRecord => Boolean(item));
         setDailyMoods(mappedMoods);
       } finally {
@@ -1916,6 +1970,61 @@ function formatLocalEntryDate(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function normalizeMemberName(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "maia" || normalized === "宝贝") return "Maia";
+  if (normalized === "husband" || normalized === "老公") return "Husband";
+  return null;
+}
+
+function getFallbackMemberName(role: string | null) {
+  return role === ROLE_BABY ? "Maia" : role === ROLE_HUSBAND ? "Husband" : "";
+}
+
+function resolveMemberDirectory(
+  members: CoupleMemberRow[],
+  currentUserId: string,
+  currentRole: string | null,
+  fallbackCoupleId: string
+): MemberDirectory {
+  const current = members.find((member) => member.user_id === currentUserId) ?? null;
+  const remaining = current ? members.filter((member) => member.user_id !== current.user_id) : members;
+  const partner = remaining[0] ?? null;
+
+  if (current || partner) {
+    return {
+      current,
+      partner,
+      coupleId: current?.couple_id ?? partner?.couple_id ?? fallbackCoupleId
+    };
+  }
+
+  const fallbackCurrentName = getFallbackMemberName(currentRole);
+  const fallbackPartnerName = fallbackCurrentName === "Maia" ? "Husband" : fallbackCurrentName === "Husband" ? "Maia" : "";
+
+  return {
+    current: fallbackCurrentName
+      ? {
+          id: `fallback-${fallbackCurrentName.toLowerCase()}`,
+          couple_id: fallbackCoupleId,
+          user_id: currentUserId,
+          display_name: fallbackCurrentName,
+          created_at: ""
+        }
+      : null,
+    partner: fallbackPartnerName
+      ? {
+          id: `fallback-${fallbackPartnerName.toLowerCase()}`,
+          couple_id: fallbackCoupleId,
+          user_id: fallbackPartnerName === "Maia" ? babyUserId : husbandUserId,
+          display_name: fallbackPartnerName,
+          created_at: ""
+        }
+      : null,
+    coupleId: fallbackCoupleId
+  };
+}
+
 function formatEntryTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
@@ -1977,9 +2086,19 @@ function getMoodDotColor(person: "baby" | "husband", level: number) {
     : `rgba(125, 167, 223, ${Math.min(opacity, 0.92)})`;
 }
 
-function mapMoodRowToUi(row: DailyMoodRow): DailyMoodRecord | null {
+function mapMoodRowToUi(
+  row: DailyMoodRow,
+  currentMemberName: "Maia" | "Husband",
+  partnerMemberName: "Maia" | "Husband",
+  currentUserId: string,
+  partnerUserId: string
+): DailyMoodRecord | null {
   const from =
-    row.user_id === babyUserId ? "Maia" : row.user_id === husbandUserId ? "Husband" : null;
+    row.user_id === currentUserId
+      ? currentMemberName
+      : row.user_id === partnerUserId
+        ? partnerMemberName
+        : null;
 
   if (!from) return null;
 
