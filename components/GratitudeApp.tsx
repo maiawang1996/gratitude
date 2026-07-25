@@ -2062,17 +2062,29 @@ function resolveMemberDirectory(
   const current = members.find((member) => member.user_id === currentUserId) ?? null;
   const remaining = current ? members.filter((member) => member.user_id !== current.user_id) : members;
   const partner = remaining[0] ?? null;
+  const fallbackCurrentName = getFallbackMemberName(currentRole);
+  const fallbackPartnerName =
+    fallbackCurrentName === "Maia" ? "Husband" : fallbackCurrentName === "Husband" ? "Maia" : "";
+  const fallbackPartnerUserId =
+    fallbackPartnerName === "Maia" ? babyUserId : fallbackPartnerName === "Husband" ? husbandUserId : "";
 
   if (current || partner) {
     return {
       current,
-      partner,
+      partner:
+        partner ??
+        (fallbackPartnerName && fallbackPartnerUserId
+          ? {
+              id: `fallback-${fallbackPartnerName.toLowerCase()}`,
+              couple_id: current?.couple_id ?? fallbackCoupleId,
+              user_id: fallbackPartnerUserId,
+              display_name: fallbackPartnerName,
+              created_at: ""
+            }
+          : null),
       coupleId: current?.couple_id ?? partner?.couple_id ?? fallbackCoupleId
     };
   }
-
-  const fallbackCurrentName = getFallbackMemberName(currentRole);
-  const fallbackPartnerName = fallbackCurrentName === "Maia" ? "Husband" : fallbackCurrentName === "Husband" ? "Maia" : "";
 
   return {
     current: fallbackCurrentName
@@ -2088,7 +2100,7 @@ function resolveMemberDirectory(
       ? {
           id: `fallback-${fallbackPartnerName.toLowerCase()}`,
           couple_id: fallbackCoupleId,
-          user_id: fallbackPartnerName === "Maia" ? babyUserId : husbandUserId,
+          user_id: fallbackPartnerUserId,
           display_name: fallbackPartnerName,
           created_at: ""
         }
@@ -2168,7 +2180,7 @@ function mapMoodRowToUi(
   const from =
     row.user_id === currentUserId
       ? currentMemberName
-      : row.user_id === partnerUserId
+      : row.user_id === partnerUserId || partnerUserId.length === 0
         ? partnerMemberName
         : null;
 
