@@ -1914,6 +1914,8 @@ function MoodCalendarCard({
   onPreviousMonth: () => void;
   onNextMonth: () => void;
 }) {
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDayOverlay, setSelectedDayOverlay] = useState<number | null>(null);
   const babyLegend = [
     { level: 1 },
     { level: 2 },
@@ -1924,6 +1926,10 @@ function MoodCalendarCard({
     { level: 7 }
   ];
   const husbandLegend = babyLegend;
+  const selectedDayEntry =
+    selectedDay === null
+      ? null
+      : calendarDays.find((day) => day.isCurrentMonth && day.dayNumber === selectedDay) ?? null;
 
   return (
     <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
@@ -1970,10 +1976,22 @@ function MoodCalendarCard({
                 </div>
               ))}
               {calendarDays.map((day) => (
-                <div
+                <button
                   key={day.key}
-                  className={`mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-[14px] ${
-                    day.isCurrentMonth ? "bg-[#fffdf9]" : "bg-transparent"
+                  type="button"
+                  onClick={() => {
+                    if (!day.isCurrentMonth || !day.dayNumber) return;
+                    setSelectedDay(day.dayNumber);
+                    setSelectedDayOverlay(day.dayNumber);
+                    window.setTimeout(() => setSelectedDayOverlay(null), 1400);
+                  }}
+                  disabled={!day.isCurrentMonth || day.dayNumber === null}
+                  className={`mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-[14px] transition ${
+                    day.isCurrentMonth
+                      ? selectedDay === day.dayNumber
+                        ? "bg-[#fff0e3] ring-1 ring-[#efb08c]"
+                        : "bg-[#fffdf9]"
+                      : "bg-transparent"
                   }`}
                 >
                   <span className={day.isCurrentMonth ? "text-[#6f5c52]" : "text-transparent"}>{day.dayNumber ?? ""}</span>
@@ -1991,12 +2009,38 @@ function MoodCalendarCard({
                       />
                     ) : null}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         </>
       )}
+
+      {selectedDayOverlay && selectedDayEntry ? (
+        <div className="fixed inset-0 z-[67] flex items-center justify-center bg-[#fffdf9]/98 px-4 backdrop-blur-[2px]">
+          <div className="flex w-full max-w-[320px] flex-col items-center rounded-[32px] border border-[#eadfce] bg-[#fffdf9] px-6 py-8 text-center shadow-[0_20px_60px_rgba(150,115,83,0.12)]">
+            <div className="relative flex h-24 w-24 items-center justify-center">
+              <div className="absolute h-24 w-24 rounded-full bg-[#fff1e5] opacity-80 animate-[pulse_0.95s_ease-in-out_infinite]" />
+              <span className="relative text-[2rem] font-semibold text-ink">{selectedDayEntry.dayNumber}</span>
+            </div>
+            <p className="mt-4 text-[1.25rem] font-semibold text-ink">{monthLabel} {selectedDayEntry.dayNumber} 日</p>
+            <div className="mt-3 flex items-center gap-5 text-sm text-[#6f5c52]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#8f7568]">宝贝</span>
+                <span className="text-[1.4rem] leading-none">
+                  {selectedDayEntry.babyMoodLevel ? getMoodEmojiByLevel(selectedDayEntry.babyMoodLevel) : "—"}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#8f7568]">老公</span>
+                <span className="text-[1.4rem] leading-none">
+                  {selectedDayEntry.husbandMoodLevel ? getMoodEmojiByLevel(selectedDayEntry.husbandMoodLevel) : "—"}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2267,6 +2311,27 @@ function getMoodDotColor(person: "baby" | "husband", level: number) {
   return person === "baby"
     ? `rgba(217, 107, 107, ${Math.min(opacity, 0.92)})`
     : `rgba(125, 167, 223, ${Math.min(opacity, 0.92)})`;
+}
+
+function getMoodEmojiByLevel(level: number) {
+  switch (level) {
+    case 7:
+      return "🥳";
+    case 6:
+      return "🥰";
+    case 5:
+      return "😉";
+    case 4:
+      return "😴";
+    case 3:
+      return "🫥";
+    case 2:
+      return "😶";
+    case 1:
+      return "😣";
+    default:
+      return "—";
+  }
 }
 
 function mapMoodRowToUi(
