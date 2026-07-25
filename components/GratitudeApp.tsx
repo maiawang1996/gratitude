@@ -31,6 +31,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 const LAST_EMAIL_KEY = "gratitude-last-email";
 const TRUST_DEVICE_KEY = "gratitude-trust-device";
 const DAILY_REMINDER_KEY = "gratitude-daily-reminder";
+const DAILY_MOOD_CACHE_KEY = "gratitude-daily-mood";
 const ROLE_BABY = "baby";
 const ROLE_HUSBAND = "husband";
 const LOVE_START_DATE = "2017-09-12";
@@ -199,6 +200,14 @@ export function GratitudeApp() {
       if (existingIndex === -1) return [...current, nextRecord];
       return current.map((item, index) => (index === existingIndex ? nextRecord : item));
     });
+    try {
+      window.localStorage.setItem(
+        `${DAILY_MOOD_CACHE_KEY}:${fallbackId}:${today}`,
+        nextMood
+      );
+    } catch {
+      // Ignore storage errors.
+    }
     window.setTimeout(() => setMoodOverlay(null), 1100);
 
     if (!currentUserId || !coupleId) {
@@ -520,7 +529,19 @@ export function GratitudeApp() {
       (item) => item.userId === activeUserId && item.localEntryDate === today
     );
 
-    setMood(todayMood?.mood ?? null);
+    if (todayMood?.mood) {
+      setMood(todayMood.mood);
+      return;
+    }
+
+    try {
+      const cachedMood = window.localStorage.getItem(
+        `${DAILY_MOOD_CACHE_KEY}:${activeUserId}:${today}`
+      ) as MoodKey | null;
+      setMood(cachedMood ?? null);
+    } catch {
+      setMood(null);
+    }
   }, [currentRole, currentUserId, dailyMoods]);
 
   useEffect(() => {
