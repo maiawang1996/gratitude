@@ -1957,7 +1957,7 @@ function MoodCalendarCard({
         <p className="text-sm leading-7 text-[#8f7568]">这个月还没开始。</p>
       ) : (
         <>
-          <div className="mb-3 grid gap-2.5">
+          <div className="mb-2 flex items-center justify-between gap-3 overflow-x-auto">
             <MoodLegendRow title="宝贝" person="baby" items={babyLegend} />
             <MoodLegendRow title="老公" person="husband" items={husbandLegend} />
           </div>
@@ -2011,9 +2011,9 @@ function MoodLegendRow({
   items: Array<{ level: number }>;
 }) {
   return (
-    <div className="rounded-[18px] bg-[#fff8f1] px-3 py-2.5">
-      <p className="mb-2 text-[0.82rem] font-semibold text-ink">{title}</p>
-      <div className="flex flex-wrap gap-2">
+    <div className="inline-flex shrink-0 items-center gap-2">
+      <p className="text-[0.76rem] font-semibold text-ink">{title}</p>
+      <div className="flex flex-wrap gap-1.5">
         {items.map((item) => (
           <span
             key={`${person}-${item.level}`}
