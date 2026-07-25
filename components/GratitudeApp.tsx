@@ -1214,6 +1214,16 @@ export function GratitudeApp() {
             <section className="mt-4">
               <OverallStatsCard stats={overallStats} />
             </section>
+
+            <section className="mt-4">
+              <MoodCalendarCard
+                monthLabel={monthlyReview.monthLabel}
+                isFutureMonth={monthlyReview.isFutureMonth}
+                calendarDays={monthlyReview.calendarDays}
+                onPreviousMonth={() => setReviewMonthOffset((current) => current - 1)}
+                onNextMonth={() => setReviewMonthOffset((current) => current + 1)}
+              />
+            </section>
           </>
         ) : tab === "memory" ? (
           <>
@@ -1795,8 +1805,6 @@ function MonthlyReviewCard({
   onPreviousMonth: () => void;
   onNextMonth: () => void;
 }) {
-  const [calendarMode, setCalendarMode] = useState<"sent" | "mood">("sent");
-
   return (
     <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -1838,41 +1846,16 @@ function MonthlyReviewCard({
 
           <div className="rounded-[20px] bg-[#fff8f1] p-3">
             <div className="mb-2 flex items-center justify-between">
-              <div className="grid grid-cols-2 gap-1 rounded-[16px] bg-[#f6efe7] p-1">
-                <button
-                  type="button"
-                  onClick={() => setCalendarMode("sent")}
-                  className={`rounded-[12px] px-2.5 py-1.5 text-[0.75rem] font-semibold transition ${
-                    calendarMode === "sent" ? "bg-white text-ink shadow-sm" : "text-[#8f7568]"
-                  }`}
-                >
-                  发送日历
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCalendarMode("mood")}
-                  className={`rounded-[12px] px-2.5 py-1.5 text-[0.75rem] font-semibold transition ${
-                    calendarMode === "mood" ? "bg-white text-ink shadow-sm" : "text-[#8f7568]"
-                  }`}
-                >
-                  心情日历
-                </button>
-              </div>
+              <p className="rounded-[12px] bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-ink shadow-sm">
+                发送日历
+              </p>
               <div className="flex items-center gap-3 text-[0.72rem] text-[#8f7568]">
                 <span className="inline-flex items-center gap-1">
-                  {calendarMode === "sent" ? (
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#f4a06f]" />
-                  ) : (
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#d96b6b]" />
-                  )}
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#f4a06f]" />
                   宝贝
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  {calendarMode === "sent" ? (
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#c9ab7b]" />
-                  ) : (
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#7da7df]" />
-                  )}
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#c9ab7b]" />
                   老公
                 </span>
               </div>
@@ -1891,27 +1874,10 @@ function MonthlyReviewCard({
                   }`}
                 >
                   <span className={day.isCurrentMonth ? "text-[#6f5c52]" : "text-transparent"}>{day.dayNumber ?? ""}</span>
-                  {calendarMode === "sent" ? (
-                    <span className="mt-0.5 flex items-center gap-1">
-                      {day.hasBaby ? <span className="h-1.5 w-1.5 rounded-full bg-[#f4a06f]" /> : null}
-                      {day.hasHusband ? <span className="h-1.5 w-1.5 rounded-full bg-[#c9ab7b]" /> : null}
-                    </span>
-                  ) : (
-                    <span className="mt-0.5 flex items-center gap-1">
-                      {day.babyMoodLevel ? (
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: getMoodDotColor("baby", day.babyMoodLevel) }}
-                        />
-                      ) : null}
-                      {day.husbandMoodLevel ? (
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: getMoodDotColor("husband", day.husbandMoodLevel) }}
-                        />
-                      ) : null}
-                    </span>
-                  )}
+                  <span className="mt-0.5 flex items-center gap-1">
+                    {day.hasBaby ? <span className="h-1.5 w-1.5 rounded-full bg-[#f4a06f]" /> : null}
+                    {day.hasHusband ? <span className="h-1.5 w-1.5 rounded-full bg-[#c9ab7b]" /> : null}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1923,6 +1889,141 @@ function MonthlyReviewCard({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MoodCalendarCard({
+  monthLabel,
+  isFutureMonth,
+  calendarDays,
+  onPreviousMonth,
+  onNextMonth
+}: {
+  monthLabel: string;
+  isFutureMonth: boolean;
+  calendarDays: Array<{
+    key: string;
+    dayNumber: number | null;
+    hasBaby: boolean;
+    hasHusband: boolean;
+    babyMoodLevel: number | null;
+    husbandMoodLevel: number | null;
+    isCurrentMonth: boolean;
+  }>;
+  onPreviousMonth: () => void;
+  onNextMonth: () => void;
+}) {
+  const babyLegend = [
+    { label: "😣", level: 1 },
+    { label: "😶", level: 2 },
+    { label: "🫥", level: 3 },
+    { label: "😴", level: 4 },
+    { label: "😉", level: 5 },
+    { label: "🥰", level: 6 },
+    { label: "🥳", level: 7 }
+  ];
+  const husbandLegend = babyLegend;
+
+  return (
+    <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <p className="text-[0.98rem] font-semibold text-ink">心情日历</p>
+          <div className="mt-1 flex items-center gap-2 text-xs text-[#8f7568]">
+            <button
+              type="button"
+              onClick={onPreviousMonth}
+              className="grid h-6 w-6 place-items-center rounded-full bg-[#fff4ea] text-[#c67c4e]"
+              aria-label="上个月"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+            <p>{monthLabel}</p>
+            <button
+              type="button"
+              onClick={onNextMonth}
+              className="grid h-6 w-6 place-items-center rounded-full bg-[#fff4ea] text-[#c67c4e]"
+              aria-label="下个月"
+            >
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <span className="rounded-full bg-[#fff4ea] px-3 py-1 text-xs text-[#c67c4e]">心情轨迹</span>
+      </div>
+
+      {isFutureMonth ? (
+        <p className="text-sm leading-7 text-[#8f7568]">这个月还没开始。</p>
+      ) : (
+        <>
+          <div className="rounded-[20px] bg-[#fff8f1] p-3">
+            <div className="grid grid-cols-7 gap-y-2 text-center text-[0.68rem] text-[#b09583]">
+              {["日", "一", "二", "三", "四", "五", "六"].map((label) => (
+                <div key={label} className="font-medium">
+                  {label}
+                </div>
+              ))}
+              {calendarDays.map((day) => (
+                <div
+                  key={day.key}
+                  className={`mx-auto flex h-9 w-9 flex-col items-center justify-center rounded-[14px] ${
+                    day.isCurrentMonth ? "bg-[#fffdf9]" : "bg-transparent"
+                  }`}
+                >
+                  <span className={day.isCurrentMonth ? "text-[#6f5c52]" : "text-transparent"}>{day.dayNumber ?? ""}</span>
+                  <span className="mt-0.5 flex items-center gap-1">
+                    {day.babyMoodLevel ? (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: getMoodDotColor("baby", day.babyMoodLevel) }}
+                      />
+                    ) : null}
+                    {day.husbandMoodLevel ? (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: getMoodDotColor("husband", day.husbandMoodLevel) }}
+                      />
+                    ) : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2.5">
+            <MoodLegendRow title="宝贝" person="baby" items={babyLegend} />
+            <MoodLegendRow title="老公" person="husband" items={husbandLegend} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MoodLegendRow({
+  title,
+  person,
+  items
+}: {
+  title: string;
+  person: "baby" | "husband";
+  items: Array<{ label: string; level: number }>;
+}) {
+  return (
+    <div className="rounded-[18px] bg-[#fff8f1] px-3 py-2.5">
+      <p className="mb-2 text-[0.82rem] font-semibold text-ink">{title}</p>
+      <div className="flex flex-wrap gap-x-3 gap-y-2">
+        {items.map((item) => (
+          <span key={`${person}-${item.level}`} className="inline-flex items-center gap-1.5 text-[0.74rem] text-[#8f7568]">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: getMoodDotColor(person, item.level) }}
+            />
+            {item.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
