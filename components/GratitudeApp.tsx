@@ -201,11 +201,14 @@ export function GratitudeApp() {
     });
     window.setTimeout(() => setMoodOverlay(null), 1100);
 
-    if (!currentUserId || !coupleId) return;
+    if (!currentUserId || !coupleId) {
+      setAuthError("心情还没有连上当前情侣关系，暂时无法保存。");
+      return;
+    }
 
     try {
       const supabase = getSupabaseBrowserClient();
-      await supabase.from("daily_moods").upsert(
+      const { error: upsertError } = await supabase.from("daily_moods").upsert(
         {
           couple_id: coupleId,
           user_id: currentUserId,
@@ -216,8 +219,49 @@ export function GratitudeApp() {
           onConflict: "couple_id,user_id,local_entry_date"
         }
       );
-    } catch {
-      // Keep local state even if mood persistence is not available yet.
+
+      if (upsertError) {
+        setAuthError(`心情保存失败：${upsertError.message}`);
+        return;
+      }
+
+      const { data: moodRows, error: reloadError } = await supabase
+        .from("daily_moods")
+        .select("*")
+        .eq("couple_id", coupleId)
+        .order("local_entry_date", { ascending: false });
+
+      if (reloadError) {
+        setAuthError(`心情刷新失败：${reloadError.message}`);
+        return;
+      }
+
+      const activeCurrentMemberName: "Maia" | "Husband" =
+        (normalizeMemberName(currentMemberName) ?? getFallbackMemberName(currentRole) ?? "Maia") === "Husband"
+          ? "Husband"
+          : "Maia";
+      const activePartnerMemberName: "Maia" | "Husband" =
+        (normalizeMemberName(partnerMemberName) ??
+          (activeCurrentMemberName === "Maia" ? "Husband" : "Maia")) === "Husband"
+          ? "Husband"
+          : "Maia";
+
+      const mappedMoods = ((moodRows as DailyMoodRow[] | null | undefined) ?? [])
+        .map((row) =>
+          mapMoodRowToUi(
+            row,
+            activeCurrentMemberName,
+            activePartnerMemberName,
+            currentUserId,
+            partnerUserId
+          )
+        )
+        .filter((item): item is DailyMoodRecord => Boolean(item));
+
+      setDailyMoods(mappedMoods);
+      setAuthError(null);
+    } catch (error) {
+      setAuthError(error instanceof Error ? `心情保存失败：${error.message}` : "心情保存失败");
     }
   };
 
