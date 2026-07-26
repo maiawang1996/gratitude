@@ -1790,6 +1790,7 @@ function MonthlyReviewCard({
     reflectionTitle: string;
     reflectionBody: string;
     rhythmLine: string;
+    trendLine: string;
     highlightDayLine: string;
     mutualLine: string;
     calendarDays: Array<{
@@ -1884,6 +1885,7 @@ function MonthlyReviewCard({
           </div>
           <div className="space-y-1.5 rounded-[20px] bg-[#fffdf9] px-3 py-3">
             <p>{review.rhythmLine}</p>
+            <p>{review.trendLine}</p>
             <p>{review.highlightDayLine}</p>
             <p>{review.mutualLine}</p>
           </div>
@@ -2089,7 +2091,25 @@ function HistoryPanel({
 }) {
   const activeEntries = activeTab === "sent" ? sentEntries : receivedEntries;
   const [showAllEntries, setShowAllEntries] = useState(false);
-  const visibleEntries = showAllEntries ? activeEntries : activeEntries.slice(0, 5);
+  const [pageSize, setPageSize] = useState<10 | 25>(10);
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const monthOptions = Array.from(
+    new Set(activeEntries.map((item) => formatHistoryMonth(item.writtenAt)))
+  );
+  const filteredEntries =
+    monthFilter === "all"
+      ? activeEntries
+      : activeEntries.filter((item) => formatHistoryMonth(item.writtenAt) === monthFilter);
+  const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const visibleEntries = showAllEntries
+    ? filteredEntries.slice((safePage - 1) * pageSize, safePage * pageSize)
+    : activeEntries.slice(0, 5);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, showAllEntries, pageSize, monthFilter]);
 
   return (
     <div className="rounded-[24px] border border-[#eadfce] bg-[#fffdf9] p-4">
@@ -2120,10 +2140,38 @@ function HistoryPanel({
           onClick={() => onTabChange("received")}
         />
       </div>
+      {showAllEntries ? (
+        <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+          <select
+            value={monthFilter}
+            onChange={(event) => setMonthFilter(event.target.value)}
+            className="rounded-[16px] border border-[#ead8c9] bg-[#fffaf4] px-3 py-2 text-sm text-ink outline-none focus:border-[#f2a36f]"
+          >
+            <option value="all">全部月份</option>
+            {monthOptions.map((month) => (
+              <option key={month} value={month}>
+                {month}
+              </option>
+            ))}
+          </select>
+          <select
+            value={String(pageSize)}
+            onChange={(event) => setPageSize(Number(event.target.value) as 10 | 25)}
+            className="rounded-[16px] border border-[#ead8c9] bg-[#fffaf4] px-3 py-2 text-sm text-ink outline-none focus:border-[#f2a36f]"
+          >
+            <option value="10">10 条</option>
+            <option value="25">25 条</option>
+          </select>
+        </div>
+      ) : null}
       <div className="mt-3">
-        {activeEntries.length === 0 ? (
+        {(showAllEntries ? filteredEntries.length : activeEntries.length) === 0 ? (
           <p className="text-sm leading-7 text-[#8f7568]">
-            {activeTab === "sent" ? "你还没有发出过内容。" : "你还没有收到过内容。"}
+            {showAllEntries && monthFilter !== "all"
+              ? "这个月份还没有内容。"
+              : activeTab === "sent"
+                ? "你还没有发出过内容。"
+                : "你还没有收到过内容。"}
           </p>
         ) : (
           <div className="space-y-2">
@@ -2142,6 +2190,29 @@ function HistoryPanel({
           </div>
         )}
       </div>
+      {showAllEntries && filteredEntries.length > 0 ? (
+        <div className="mt-3 flex items-center justify-between text-xs text-[#8f7568]">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={safePage === 1}
+            className={`rounded-full px-3 py-1 ${safePage === 1 ? "opacity-40" : "bg-[#fff4ea] text-[#c67c4e]"}`}
+          >
+            上一页
+          </button>
+          <span>
+            第 {safePage} / {pageCount} 页
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+            disabled={safePage === pageCount}
+            className={`rounded-full px-3 py-1 ${safePage === pageCount ? "opacity-40" : "bg-[#fff4ea] text-[#c67c4e]"}`}
+          >
+            下一页
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2183,6 +2254,11 @@ function formatLocalEntryDate(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatHistoryMonth(value: string) {
+  const date = new Date(value);
+  return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`;
 }
 
 function normalizeMemberName(value: string) {
@@ -2550,7 +2626,15 @@ function buildMonthlyReview({
   const longestStreak = getLongestStreak(uniqueDays);
   const busiestDayEntry = Array.from(dayEntryCount.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
   const sharedDays = Array.from(sentDaySet).filter((day) => receivedDaySet.has(day)).sort((a, b) => a - b);
-  const spotlightEntry = currentMonthEntries.find((item) => item.body.trim().length >= 12) ?? currentMonthEntries[0] ?? null;
+  const themeInsights = summarizeMonthlyThemes(currentMonthEntries);
+  const firstHalfCount = currentMonthEntries.filter((item) => new Date(item.writtenAt).getDate() <= 15).length;
+  const secondHalfCount = currentMonthEntries.filter((item) => new Date(item.writtenAt).getDate() >= 16).length;
+  const previousMonthStart = new Date(reviewMonth.getFullYear(), reviewMonth.getMonth() - 1, 1).getTime();
+  const previousMonthEnd = monthStart;
+  const previousMonthEntries = [...sentEntries, ...receivedEntries].filter((item) => {
+    const time = new Date(item.writtenAt).getTime();
+    return time >= previousMonthStart && time < previousMonthEnd;
+  });
   const busiestDayLine = busiestDayEntry
     ? `${monthLabel}里最热闹的是 ${busiestDayEntry[0]} 号，那天你们一共留下了 ${busiestDayEntry[1]} 条内容。`
     : `${monthLabel}里还没有特别集中的记录日。`;
@@ -2564,16 +2648,34 @@ function buildMonthlyReview({
       : longestStreak > 1
         ? `这个月有 ${activeDayCount} 天留下了内容，最长连续记录了 ${longestStreak} 天。`
         : `这个月有 ${activeDayCount} 天留下了内容，节奏还比较松，但每一次记录都被留下来了。`;
+  const halfTrendLine =
+    currentMonthEntries.length === 0
+      ? ""
+      : firstHalfCount === secondHalfCount
+        ? "这个月前后半段的表达频率差不多，整体节奏比较稳定。"
+        : firstHalfCount > secondHalfCount
+          ? `这个月上半月写得更多一些（${firstHalfCount} 条），下半月稍微慢了下来（${secondHalfCount} 条）。`
+          : `这个月下半月写得更多一些（${secondHalfCount} 条），说明越到后面你们越愿意继续表达。`;
+  const monthCompareLine =
+    previousMonthEntries.length === 0
+      ? "上个月还没有足够内容做环比，这个月会成为新的起点。"
+      : previousMonthEntries.length === currentMonthEntries.length
+        ? `和上个月相比，这个月的总表达量保持在 ${currentMonthEntries.length} 条，整体比较平稳。`
+        : previousMonthEntries.length < currentMonthEntries.length
+          ? `和上个月相比，这个月多写了 ${currentMonthEntries.length - previousMonthEntries.length} 条，表达在变得更主动。`
+          : `和上个月相比，这个月少写了 ${previousMonthEntries.length - currentMonthEntries.length} 条，最近的节奏比上个月更安静一些。`;
+  const trendLine =
+    currentMonthEntries.length === 0
+      ? "等这个月有更多内容后，这里会开始出现节奏和趋势的变化。"
+      : `${halfTrendLine} ${monthCompareLine}`;
   const reflectionTitle =
     thankYouCount === 0 && noticedCount === 0
       ? "这个月还很安静"
-      : thankYouCount >= noticedCount
-        ? "这个月，你们把感谢说得更多了一点"
-        : "这个月，你们更常认真看见彼此";
+      : themeInsights.title;
   const reflectionBody =
     currentMonthEntries.length === 0
       ? "还没有足够内容生成回顾。"
-      : `${balanceLine}${spotlightEntry ? ` 这个月很像被这句话轻轻记住了：“${spotlightEntry.body}”` : ""}`;
+      : `${themeInsights.summary}${themeInsights.pattern ? ` ${themeInsights.pattern}` : ""}${balanceLine ? ` ${balanceLine}` : ""}`;
   const mutualLine =
     currentMonthEntries.length === 0
       ? "等写下第一句之后，这里会慢慢长成真正的回顾。"
@@ -2591,10 +2693,74 @@ function buildMonthlyReview({
     reflectionTitle,
     reflectionBody,
     rhythmLine,
+    trendLine,
     highlightDayLine: busiestDayLine,
     mutualLine,
     calendarDays
   };
+}
+
+function summarizeMonthlyThemes(entries: GratitudeEntry[]) {
+  if (entries.length === 0) {
+    return {
+      title: "这个月还很安静",
+      summary: "还没有足够内容生成回顾。",
+      pattern: ""
+    };
+  }
+
+  const themeDefinitions = [
+    { key: "care", label: "照顾和陪伴", keywords: ["陪", "照顾", "等你", "接你", "送你", "抱", "安慰", "休息", "陪我", "陪你"] },
+    { key: "daily", label: "日常分担", keywords: ["做饭", "洗", "收拾", "买", "家务", "准备", "带", "拿", "修", "整理"] },
+    { key: "effort", label: "努力和坚持", keywords: ["努力", "坚持", "累", "辛苦", "工作", "上班", "健身", "学习", "认真", "忙"] },
+    { key: "emotion", label: "情绪接住", keywords: ["难过", "开心", "崩溃", "焦虑", "温柔", "体贴", "理解", "耐心", "情绪"] },
+    { key: "growth", label: "彼此看见成长", keywords: ["进步", "改变", "成长", "勇敢", "更好", "尝试", "面对", "迈出"] }
+  ];
+
+  const themeScores = themeDefinitions.map((theme) => ({
+    ...theme,
+    score: entries.reduce((count, entry) => {
+      const hit = theme.keywords.some((keyword) => entry.body.includes(keyword));
+      return count + (hit ? 1 : 0);
+    }, 0)
+  }));
+
+  const topThemes = themeScores
+    .filter((theme) => theme.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+
+  const thanks = entries.filter((entry) => entry.kind === "thank_you").length;
+  const notices = entries.filter((entry) => entry.kind === "noticed").length;
+  const sameDayBackAndForth = new Set(entries.map((entry) => formatLocalEntryDate(new Date(entry.writtenAt)))).size;
+
+  let title = "这个月，你们在认真经营彼此";
+  let summary = "这个月留下来的内容，不只是记录事情，更像在记录你们如何对待彼此。";
+
+  if (topThemes.length === 1) {
+    title = `这个月，你们反复在写下${topThemes[0].label}`;
+    summary = `整个月的内容里，最明显的一条线索是${topThemes[0].label}。你们在意的不是大事件本身，而是那些具体又细小的靠近。`;
+  } else if (topThemes.length >= 2) {
+    title = `这个月，你们一边在${topThemes[0].label}，一边也在${topThemes[1].label}`;
+    summary = `把整个月的内容放在一起看，你们最常提到的其实是${topThemes[0].label}和${topThemes[1].label}。这说明这段关系里，行动上的照顾和感受上的理解是同时在发生的。`;
+  } else if (thanks > notices) {
+    title = "这个月，你们更常把爱落在感谢里";
+    summary = "这个月的表达更偏向感谢，说明你们更容易先看到对方已经为这段关系做了什么。";
+  } else {
+    title = "这个月，你们更常把爱落在看见里";
+    summary = "这个月的表达更偏向看见，说明你们不只是回应结果，也在认真观察对方当下的状态。";
+  }
+
+  let pattern = "";
+  if (sameDayBackAndForth >= 4) {
+    pattern = "从节奏上看，这个月已经出现了比较稳定的来回表达，你们像是在慢慢形成一种固定的情感接球方式。";
+  } else if (notices > thanks) {
+    pattern = "相比直接说谢谢，这个月更突出的是“我有在看见你”，这种表达通常说明关系里开始有更细的觉察。";
+  } else if (thanks > notices) {
+    pattern = "相比强调观察，这个月更突出的是及时表达感谢，这通常说明关系里的付出没有被默认，而是被认真接住了。";
+  }
+
+  return { title, summary, pattern };
 }
 
 function buildOverallStats(historyEntries: GratitudeEntry[]) {
