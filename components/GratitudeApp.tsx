@@ -1760,23 +1760,46 @@ function BirthdayWidget({
 }: {
   reminders: Array<{ title: string; detail: string; emoji: string }>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="mt-3 rounded-[24px] border border-[#eadfce] bg-[#fff6ee]/95 p-4 shadow-[0_10px_18px_rgba(184,113,93,0.06)]">
-      <p className="text-[0.86rem] font-medium text-[#8f7568]">近期提醒</p>
-      <div className="mt-2 space-y-2">
-        {reminders.map((reminder) => (
-          <div
-            key={`${reminder.title}-${reminder.detail}`}
-            className="flex items-start justify-between gap-3 rounded-[18px] bg-white/72 px-3 py-3"
-          >
-            <div>
-              <p className="text-[1rem] font-semibold text-ink">{reminder.title}</p>
-              <p className="mt-1 text-sm leading-6 text-[#8f7568]">{reminder.detail}</p>
+    <div className="mt-3 rounded-[20px] border border-[#eadfce] bg-[#fff6ee]/95 px-3 py-2.5 shadow-[0_8px_16px_rgba(184,113,93,0.05)]">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div className="min-w-0">
+          <p className="text-[0.82rem] font-medium text-[#8f7568]">近期提醒</p>
+          <p className="mt-0.5 truncate text-[0.9rem] font-semibold text-ink">
+            {reminders[0]?.title}
+            {reminders.length > 1 ? ` 等 ${reminders.length} 条` : ""}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-white px-2.5 py-1 text-[0.72rem] font-semibold text-[#c67c4e] shadow-sm">
+            {reminders.length}
+          </span>
+          <span className="text-sm text-[#a07d6c]">{expanded ? "收起" : "展开"}</span>
+        </div>
+      </button>
+
+      {expanded ? (
+        <div className="mt-2 space-y-2">
+          {reminders.map((reminder) => (
+            <div
+              key={`${reminder.title}-${reminder.detail}`}
+              className="flex items-start justify-between gap-3 rounded-[16px] bg-white/72 px-3 py-2.5"
+            >
+              <div>
+                <p className="text-[0.94rem] font-semibold text-ink">{reminder.title}</p>
+                <p className="mt-0.5 text-[0.82rem] leading-5 text-[#8f7568]">{reminder.detail}</p>
+              </div>
+              <div className="rounded-full bg-white px-2.5 py-1.5 text-base leading-none shadow-sm">{reminder.emoji}</div>
             </div>
-            <div className="rounded-full bg-white px-3 py-2 text-xl leading-none shadow-sm">{reminder.emoji}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
