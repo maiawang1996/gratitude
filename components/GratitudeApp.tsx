@@ -148,7 +148,7 @@ export function GratitudeApp() {
   const todayFeedbackEntry = pendingReceivedEntries[0] ?? null;
   const loveDuration = formatRelationshipDuration(LOVE_START_DATE);
   const marriageDuration = formatRelationshipDuration(MARRIAGE_START_DATE);
-  const upcomingReminder = getUpcomingReminder(new Date());
+  const upcomingReminders = getUpcomingReminders(new Date());
   const reviewMonthDate = new Date();
   reviewMonthDate.setMonth(reviewMonthDate.getMonth() + reviewMonthOffset);
   const monthlyReview = buildMonthlyReview({
@@ -1030,7 +1030,7 @@ export function GratitudeApp() {
                 ) : null}
               </div>
 
-              {upcomingReminder ? <BirthdayWidget reminder={upcomingReminder} /> : null}
+              {upcomingReminders.length > 0 ? <BirthdayWidget reminders={upcomingReminders} /> : null}
             </section>
 
             {pendingReceivedEntries.length > 0 ? (
@@ -1756,19 +1756,26 @@ function CountWidget({
 }
 
 function BirthdayWidget({
-  reminder
+  reminders
 }: {
-  reminder: { title: string; detail: string };
+  reminders: Array<{ title: string; detail: string; emoji: string }>;
 }) {
   return (
     <div className="mt-3 rounded-[24px] border border-[#eadfce] bg-[#fff6ee]/95 p-4 shadow-[0_10px_18px_rgba(184,113,93,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[0.86rem] font-medium text-[#8f7568]">近期提醒</p>
-          <p className="mt-1 text-[1.05rem] font-semibold text-ink">{reminder.title}</p>
-          <p className="mt-2 text-sm leading-6 text-[#8f7568]">{reminder.detail}</p>
-        </div>
-        <div className="rounded-full bg-white px-3 py-2 text-xl leading-none shadow-sm">🎂</div>
+      <p className="text-[0.86rem] font-medium text-[#8f7568]">近期提醒</p>
+      <div className="mt-2 space-y-2">
+        {reminders.map((reminder) => (
+          <div
+            key={`${reminder.title}-${reminder.detail}`}
+            className="flex items-start justify-between gap-3 rounded-[18px] bg-white/72 px-3 py-3"
+          >
+            <div>
+              <p className="text-[1rem] font-semibold text-ink">{reminder.title}</p>
+              <p className="mt-1 text-sm leading-6 text-[#8f7568]">{reminder.detail}</p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-2 text-xl leading-none shadow-sm">{reminder.emoji}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -2462,31 +2469,35 @@ function isPendingScheduledEntry(entry: GratitudeEntry) {
   return new Date(entry.deliveredAt).getTime() > Date.now();
 }
 
-function getUpcomingReminder(now: Date) {
+function getUpcomingReminders(now: Date) {
   const upcomingItems = [
     {
       kind: "birthday",
       label: "宝贝的生日",
       month: BABY_BIRTHDAY.month,
-      day: BABY_BIRTHDAY.day
+      day: BABY_BIRTHDAY.day,
+      emoji: "🎂"
     },
     {
       kind: "birthday",
       label: "老公的生日",
       month: HUSBAND_BIRTHDAY.month,
-      day: HUSBAND_BIRTHDAY.day
+      day: HUSBAND_BIRTHDAY.day,
+      emoji: "🎂"
     },
     {
       kind: "anniversary",
       label: "恋爱纪念日",
       month: Number(LOVE_START_DATE.slice(5, 7)),
-      day: Number(LOVE_START_DATE.slice(8, 10))
+      day: Number(LOVE_START_DATE.slice(8, 10)),
+      emoji: "💛"
     },
     {
       kind: "anniversary",
       label: "结婚纪念日",
       month: Number(MARRIAGE_START_DATE.slice(5, 7)),
-      day: Number(MARRIAGE_START_DATE.slice(8, 10))
+      day: Number(MARRIAGE_START_DATE.slice(8, 10)),
+      emoji: "💍"
     }
   ]
     .map((item) => {
@@ -2501,25 +2512,23 @@ function getUpcomingReminder(now: Date) {
     })
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  const nextItem = upcomingItems[0];
-  if (!nextItem || nextItem.daysLeft > UPCOMING_REMINDER_WINDOW_DAYS) {
-    return null;
-  }
+  return upcomingItems
+    .filter((item) => item.daysLeft <= UPCOMING_REMINDER_WINDOW_DAYS)
+    .map((item) => {
+      if (item.daysLeft === 0) {
+        return {
+          title: `今天是${item.label}`,
+          detail: item.kind === "birthday" ? "别忘了今天多准备一点惊喜。" : "今天值得好好纪念一下。",
+          emoji: item.emoji
+        };
+      }
 
-  if (nextItem.daysLeft === 0) {
-    return {
-      title: `今天是${nextItem.label}`,
-      detail:
-        nextItem.kind === "birthday"
-          ? "别忘了今天多准备一点惊喜。"
-          : "今天值得好好纪念一下。"
-    };
-  }
-
-  return {
-    title: `快到${nextItem.label}了`,
-    detail: `还有 ${nextItem.daysLeft} 天，就是${nextItem.label}。`
-  };
+      return {
+        title: `快到${item.label}了`,
+        detail: `还有 ${item.daysLeft} 天，就是${item.label}。`,
+        emoji: item.emoji
+      };
+    });
 }
 
 function buildMonthlyReview({
