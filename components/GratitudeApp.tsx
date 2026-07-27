@@ -1761,41 +1761,41 @@ function BirthdayWidget({
   reminders: Array<{ title: string; detail: string; emoji: string }>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const summary = reminders[0]
+    ? `${reminders[0].title}${reminders.length > 1 ? ` 等 ${reminders.length} 条` : ""}`
+    : "近期提醒";
 
   return (
-    <div className="mt-3 rounded-[20px] border border-[#eadfce] bg-[#fff6ee]/95 px-3 py-2.5 shadow-[0_8px_16px_rgba(184,113,93,0.05)]">
+    <div className="mt-2 rounded-[18px] border border-[#eadfce] bg-[#fff7f0]/92 px-3 py-2 shadow-[0_6px_12px_rgba(184,113,93,0.05)]">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="flex w-full items-center justify-between gap-2 text-left"
       >
-        <div className="min-w-0">
-          <p className="text-[0.82rem] font-medium text-[#8f7568]">近期提醒</p>
-          <p className="mt-0.5 truncate text-[0.9rem] font-semibold text-ink">
-            {reminders[0]?.title}
-            {reminders.length > 1 ? ` 等 ${reminders.length} 条` : ""}
-          </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-[0.82rem] font-medium text-[#8f7568]">近期提醒</span>
+          <p className="truncate text-[0.83rem] text-[#7f685d]">{summary}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-white px-2.5 py-1 text-[0.72rem] font-semibold text-[#c67c4e] shadow-sm">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-full bg-white/95 px-2 py-0.5 text-[0.68rem] font-semibold text-[#c67c4e] shadow-sm">
             {reminders.length}
           </span>
-          <span className="text-sm text-[#a07d6c]">{expanded ? "收起" : "展开"}</span>
+          <span className="text-[0.76rem] text-[#a07d6c]">{expanded ? "收起" : "展开"}</span>
         </div>
       </button>
 
       {expanded ? (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-1.5">
           {reminders.map((reminder) => (
             <div
               key={`${reminder.title}-${reminder.detail}`}
-              className="flex items-start justify-between gap-3 rounded-[16px] bg-white/72 px-3 py-2.5"
+              className="flex items-start justify-between gap-2 rounded-[14px] bg-white/78 px-2.5 py-2"
             >
-              <div>
-                <p className="text-[0.94rem] font-semibold text-ink">{reminder.title}</p>
-                <p className="mt-0.5 text-[0.82rem] leading-5 text-[#8f7568]">{reminder.detail}</p>
+              <div className="min-w-0">
+                <p className="truncate text-[0.84rem] font-semibold text-ink">{reminder.title}</p>
+                <p className="mt-0.5 text-[0.76rem] leading-5 text-[#8f7568]">{reminder.detail}</p>
               </div>
-              <div className="rounded-full bg-white px-2.5 py-1.5 text-base leading-none shadow-sm">{reminder.emoji}</div>
+              <div className="rounded-full bg-white px-2 py-1 text-[0.88rem] leading-none shadow-sm">{reminder.emoji}</div>
             </div>
           ))}
         </div>
