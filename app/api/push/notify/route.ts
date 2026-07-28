@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       supabaseClient: supabase
     });
 
-    return NextResponse.json({ ok: true, count: result.count });
+    return NextResponse.json({ ok: true, count: result.count, sent: result.sent, failed: result.failed });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "推送失败" },

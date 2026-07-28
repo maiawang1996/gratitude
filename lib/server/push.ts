@@ -82,9 +82,13 @@ export async function sendPushToUser({
   }
 
   const subscriptions = (subscriptionsRaw ?? []) as PushSubscriptionRow[];
+  if (subscriptions.length === 0) {
+    throw new Error("没有可用的提醒订阅");
+  }
+
   const payload = JSON.stringify({ title, body: message, url });
 
-  await Promise.allSettled(
+  const settled = await Promise.allSettled(
     subscriptions.map((item) =>
       webpush.sendNotification(
         {
@@ -96,5 +100,11 @@ export async function sendPushToUser({
     )
   );
 
-  return { count: subscriptions.length };
+  const sent = settled.filter((result) => result.status === "fulfilled").length;
+  const failed = settled.length - sent;
+  if (sent === 0) {
+    throw new Error("提醒发送失败");
+  }
+
+  return { count: subscriptions.length, sent, failed };
 }

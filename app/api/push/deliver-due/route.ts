@@ -66,7 +66,7 @@ async function handleDelivery(request: Request) {
 
   for (const entry of dueEntries) {
     try {
-      await sendPushToUser({
+      const result = await sendPushToUser({
         recipientId: entry.recipient_id,
         title: entry.kind === "thank_you" ? "收到一条谢谢你" : "收到一条我看见了",
         message: entry.body,
@@ -74,7 +74,7 @@ async function handleDelivery(request: Request) {
         supabaseClient: supabase
       });
       deliveredIds.push(entry.id);
-      sent += 1;
+      sent += result.sent;
     } catch (sendError) {
       failures.push({
         id: entry.id,
