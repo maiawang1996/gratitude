@@ -131,6 +131,7 @@ export function GratitudeApp() {
   const [dailyReminderVisible, setDailyReminderVisible] = useState(false);
   const [featureRowsExpanded, setFeatureRowsExpanded] = useState(false);
   const [birthdayPanelExpanded, setBirthdayPanelExpanded] = useState(false);
+  const [moodPickerExpanded, setMoodPickerExpanded] = useState(false);
   const [reviewMonthOffset, setReviewMonthOffset] = useState(0);
 
   const readableDeliveryTime = formatDeliveryTime(deliveryTime);
@@ -168,6 +169,7 @@ export function GratitudeApp() {
     { key: "sleepy" as const, emoji: "😴", overlayTitle: "今天有点困困的", overlayBody: "先慢一点，补满元气再继续" },
     { key: "tired" as const, emoji: "😣", overlayTitle: "今天有点累了，要多休息照顾自己呀", overlayBody: "先抱一抱自己，再慢慢往前走" }
   ];
+  const selectedMoodItem = moodItems.find((item) => item.key === mood) ?? null;
 
   const triggerTodayFeedback = async (reaction: "seen" | "loved") => {
     if (!todayFeedbackEntry) return;
@@ -186,6 +188,7 @@ export function GratitudeApp() {
         : "Maia";
     const fallbackId = currentUserId || (currentRole === ROLE_BABY ? babyUserId : husbandUserId);
     setMood(nextMood);
+    setMoodPickerExpanded(false);
     setMoodOverlay(nextMood);
     setDailyMoods((current) => {
       const existingIndex = current.findIndex((item) => item.userId === fallbackId && item.localEntryDate === today);
@@ -1001,34 +1004,54 @@ export function GratitudeApp() {
                 />
               </div>
 
-              <div className="mt-3 rounded-[22px] border border-[#eadfce] bg-white/58 px-3 py-3 shadow-[0_8px_18px_rgba(184,113,93,0.06)] backdrop-blur-xl">
-                <p className="text-[0.84rem] font-medium text-[#8f7568]">今天心情怎么样？</p>
-                <div className="mt-2 grid grid-cols-7 gap-1.5">
-                  {moodItems.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      aria-pressed={mood === item.key}
-                      data-selected={mood === item.key ? "true" : "false"}
-                      onClick={() => void handleSelectMood(item.key)}
-                      className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
-                        mood === item.key
-                          ? "scale-105 border-[#efb08c] bg-[#fff2e8] opacity-100 shadow-[0_10px_18px_rgba(184,113,93,0.18)]"
-                          : mood
-                            ? "border-[#f2e8dd] bg-white/45 opacity-40 saturate-50"
-                            : "border-[#efe2d6] bg-white/75 opacity-100"
-                      }`}
-                    >
-                      {item.emoji}
-                    </button>
-                  ))}
+              {mood && !moodPickerExpanded ? (
+                <button
+                  type="button"
+                  onClick={() => setMoodPickerExpanded(true)}
+                  className="mt-3 flex w-full items-center justify-between rounded-[18px] border border-[#eadfce] bg-white/58 px-3 py-2 text-left shadow-[0_6px_14px_rgba(184,113,93,0.05)] backdrop-blur-xl"
+                >
+                  <span className="text-[0.82rem] font-medium text-[#8f7568]">今日心情</span>
+                  <span className="flex items-center gap-2 text-[0.8rem] text-[#7f685d]">
+                    <span className="text-[1rem] leading-none">{selectedMoodItem?.emoji}</span>
+                    已记录
+                  </span>
+                </button>
+              ) : (
+                <div className="mt-3 rounded-[22px] border border-[#eadfce] bg-white/58 px-3 py-3 shadow-[0_8px_18px_rgba(184,113,93,0.06)] backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[0.84rem] font-medium text-[#8f7568]">今天心情怎么样？</p>
+                    {mood ? (
+                      <button
+                        type="button"
+                        onClick={() => setMoodPickerExpanded(false)}
+                        className="text-[0.76rem] text-[#a07d6c]"
+                      >
+                        收起
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="mt-2 grid grid-cols-7 gap-1.5">
+                    {moodItems.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        aria-pressed={mood === item.key}
+                        data-selected={mood === item.key ? "true" : "false"}
+                        onClick={() => void handleSelectMood(item.key)}
+                        className={`grid h-9 w-9 place-items-center rounded-full border text-[1.05rem] leading-none transition ${
+                          mood === item.key
+                            ? "scale-105 border-[#efb08c] bg-[#fff2e8] opacity-100 shadow-[0_10px_18px_rgba(184,113,93,0.18)]"
+                            : mood
+                              ? "border-[#f2e8dd] bg-white/45 opacity-40 saturate-50"
+                              : "border-[#efe2d6] bg-white/75 opacity-100"
+                        }`}
+                      >
+                        {item.emoji}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {mood ? (
-                  <p className="mt-2 text-[0.74rem] font-medium text-[#a07d6c]">
-                    已记录今天的心情
-                  </p>
-                ) : null}
-              </div>
+              )}
 
               {upcomingReminders.length > 0 ? <BirthdayWidget reminders={upcomingReminders} /> : null}
             </section>
