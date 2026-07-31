@@ -1937,19 +1937,15 @@ function MonthlyReviewCard({
                 </div>
               ))}
             </div>
-            <div className="mt-3 overflow-hidden rounded-[14px] border border-[#f1e4d7] bg-[#fffdf9]/85 text-[0.78rem]">
-              <div className="grid grid-cols-[1fr_auto] items-center border-b border-[#f1e4d7] px-3 py-1.5">
-                <span className="inline-flex items-center gap-1.5 font-medium text-[#7a6256]">
-                  <span className="h-2 w-2 rounded-full bg-[#f4a06f]" />
-                  宝贝
-                </span>
+            <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-[14px] border border-[#f1e4d7] bg-[#fffdf9]/85 text-[0.78rem]">
+              <div className="flex items-center justify-center gap-1.5 border-r border-[#f1e4d7] px-2.5 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#f4a06f]" />
+                <span className="font-medium text-[#7a6256]">宝贝</span>
                 <span className="font-semibold text-ink">{review.babySentCount} 条</span>
               </div>
-              <div className="grid grid-cols-[1fr_auto] items-center px-3 py-1.5">
-                <span className="inline-flex items-center gap-1.5 font-medium text-[#7a6256]">
-                  <span className="h-2 w-2 rounded-full bg-[#c9ab7b]" />
-                  老公
-                </span>
+              <div className="flex items-center justify-center gap-1.5 px-2.5 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#c9ab7b]" />
+                <span className="font-medium text-[#7a6256]">老公</span>
                 <span className="font-semibold text-ink">{review.husbandSentCount} 条</span>
               </div>
             </div>
