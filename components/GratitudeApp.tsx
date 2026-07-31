@@ -1837,6 +1837,8 @@ function MonthlyReviewCard({
     isFutureMonth: boolean;
     sentCount: number;
     receivedCount: number;
+    babySentCount: number;
+    husbandSentCount: number;
     thankYouCount: number;
     noticedCount: number;
     recentLine: string | null;
@@ -1934,6 +1936,22 @@ function MonthlyReviewCard({
                   </span>
                 </div>
               ))}
+            </div>
+            <div className="mt-3 overflow-hidden rounded-[14px] border border-[#f1e4d7] bg-[#fffdf9]/85 text-[0.78rem]">
+              <div className="grid grid-cols-[1fr_auto] items-center border-b border-[#f1e4d7] px-3 py-1.5">
+                <span className="inline-flex items-center gap-1.5 font-medium text-[#7a6256]">
+                  <span className="h-2 w-2 rounded-full bg-[#f4a06f]" />
+                  宝贝
+                </span>
+                <span className="font-semibold text-ink">{review.babySentCount} 条</span>
+              </div>
+              <div className="grid grid-cols-[1fr_auto] items-center px-3 py-1.5">
+                <span className="inline-flex items-center gap-1.5 font-medium text-[#7a6256]">
+                  <span className="h-2 w-2 rounded-full bg-[#c9ab7b]" />
+                  老公
+                </span>
+                <span className="font-semibold text-ink">{review.husbandSentCount} 条</span>
+              </div>
             </div>
           </div>
           <div className="space-y-1.5 rounded-[20px] bg-[#fffdf9] px-3 py-3">
@@ -2605,6 +2623,8 @@ function buildMonthlyReview({
   const monthLabel = `${reviewMonth.getFullYear()} 年 ${reviewMonth.getMonth() + 1} 月`;
   const sentCount = currentMonthEntries.filter((item) => sentEntries.some((sent) => sent.id === item.id)).length;
   const receivedCount = currentMonthEntries.filter((item) => receivedEntries.some((received) => received.id === item.id)).length;
+  const babySentCount = currentMonthEntries.filter((item) => item.from === "Maia").length;
+  const husbandSentCount = currentMonthEntries.filter((item) => item.from === "Husband").length;
   const thankYouCount = currentMonthEntries.filter((item) => item.kind === "thank_you").length;
   const noticedCount = currentMonthEntries.filter((item) => item.kind === "noticed").length;
   const recentLine = currentMonthEntries[0]?.body ?? null;
@@ -2742,6 +2762,8 @@ function buildMonthlyReview({
     isFutureMonth,
     sentCount,
     receivedCount,
+    babySentCount,
+    husbandSentCount,
     thankYouCount,
     noticedCount,
     recentLine,
